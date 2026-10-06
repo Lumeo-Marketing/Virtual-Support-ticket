@@ -1,0 +1,7 @@
+node_modules/
+.next/
+.env*
+!.env.example
+support.db*
+uploads/*
+echo back.zip >> .gitignoreback.zip

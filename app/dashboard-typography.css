@@ -1,0 +1,96 @@
+/* Readability pass: dashboard controls and dense data surfaces should remain legible at a glance. */
+.app-shell{font-size:14px}
+.sidebar-brand small{font-size:9px}
+.workspace-pill{font-size:12px}
+.nav-label{font-size:10px}
+.side-item{font-size:13px}
+.side-count{font-size:10px}
+.help-card>b{font-size:12px}
+.help-card>p{font-size:10px}
+.help-card>button{font-size:10px}
+.sidebar-user b{font-size:11px}
+.sidebar-user small{font-size:9px}
+.breadcrumbs{font-size:11px}
+.global-search input{font-size:12px}
+.top-user b{font-size:11px}
+.top-user small{font-size:9px}
+.date-kicker{font-size:10px}
+.page-heading h1{font-size:30px}
+.page-heading p{font-size:13px}
+.button{font-size:12px}
+.welcome-chip{font-size:9px}
+.welcome-text h2{font-size:23px}
+.welcome-text p{font-size:12px}
+.welcome-action{font-size:11px}
+.metric-label{font-size:11px}
+.metric-value{font-size:29px}
+.metric-caption{font-size:10px}
+.card-heading h3,.users-toolbar h3,.activity-toolbar h3{font-size:14px}
+.card-heading p,.users-toolbar p,.activity-toolbar p{font-size:11px}
+.card-link{font-size:11px}
+.dashboard-ticket-table th{font-size:10px}
+.dashboard-ticket-table td{font-size:11px}
+.dashboard-ticket-table td b{font-size:11px}
+.dashboard-ticket-table td small{font-size:10px}
+.status-label,.priority-label{font-size:10px!important}
+.updated-cell{font-size:10px!important}
+.side-stat-heading{font-size:9px}
+.side-stat-card h3{font-size:14px}
+.side-stat-card>p{font-size:11px}
+.health-line>b,.health-line>em{font-size:10px}
+.help-panel h3{font-size:15px}
+.help-panel p{font-size:11px}
+.outline-action{font-size:10px}
+.response-note>div>b{font-size:11px}
+.response-note>div>p{font-size:10px}
+.queue-summary>div:first-child b{font-size:16px}
+.queue-summary>div:first-child small{font-size:10px}
+.queue-search input{font-size:11px}
+.filter-select select{font-size:11px}
+.user-note>div>b{font-size:11px}
+.user-note>div>p{font-size:10px}
+.users-toolbar h3 span{font-size:10px}
+.owner-tag,.role-chip,.role-select,.account-status,.access-action,.protected-label{font-size:10px}
+.subtle-cell{font-size:11px!important}
+.activity-copy>div>b,.activity-copy>div>span:not(.role-tag){font-size:11px}
+.activity-copy>p,.activity-copy>small,.activity-row time{font-size:10px}
+.role-tag{font-size:8px}
+.activity-target{font-size:10px!important}
+.dialog-kicker{font-size:9px}
+.dialog-heading h2{font-size:24px}
+.dialog-heading p{font-size:11px}
+.form-section-name{font-size:12px}
+.form-section-name small{font-size:10px}
+.request-grid label,.resolve-fields label{font-size:11px}
+.request-grid input,.request-grid select,.request-grid textarea,.resolve-fields select,.resolve-fields textarea,.add-user-form input,.add-user-form select{font-size:11px}
+.detail-info-grid small,.ticket-description>small,.existing-resolution>small,.staff-resolution>small{font-size:9px}
+.detail-info-grid b{font-size:11px}
+.detail-info-grid span{font-size:10px}
+.ticket-description p,.existing-resolution p,.staff-resolution p{font-size:12px}
+.dialog-section-title>b{font-size:12px}
+.dialog-section-title>span,.existing-resolution>span{font-size:10px}
+.add-user-form>label{font-size:11px}
+.add-user-form label>small{font-size:10px}
+.toast-message{font-size:12px}
+.app-footer{font-size:10px}
+@media(max-width:720px){
+  .page-heading h1{font-size:24px}
+  .page-heading p{font-size:11px}
+  .breadcrumbs{font-size:10px}
+  .welcome-text h2{font-size:19px}
+  .welcome-text p{font-size:10px}
+  .metric-label{font-size:10px}
+  .metric-value{font-size:25px}
+  .metric-caption{font-size:9px}
+  .dashboard-ticket-table th{font-size:9px}
+  .dashboard-ticket-table td,.dashboard-ticket-table td b{font-size:10px}
+  .dashboard-ticket-table td small{font-size:9px}
+  .side-stat-card>p,.help-panel p{font-size:10px}
+  .app-footer{font-size:8px}
+}
+
+/* Set a legibility floor across the authenticated interface, not only its headings. */
+.app-shell{font-size:14px}
+.app-shell :is(p,span,b,strong,small,label,button,input,select,textarea,th,td,time,em,kbd,a){
+  font-size:max(12px,.86em)!important;
+}
