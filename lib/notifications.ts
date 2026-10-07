@@ -8,7 +8,7 @@ export type TicketEmailDetails = Pick<TicketRecord,
 >;
 
 const globalForMail = globalThis as unknown as { lumeoMailer?: Transporter };
-const brand = "LUMEO IT Support";
+const senderName = "Lumeo Virtual Ticket";
 
 function escapeHtml(value: unknown) {
   return String(value ?? "").replace(/[&<>\"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" })[char]!);
@@ -69,7 +69,8 @@ async function deliver(options: SendMailOptions, context: string) {
     return;
   }
   try {
-    const result = await transport.sendMail({ from: process.env.SMTP_FROM || `LUMEO IT Support <${process.env.SMTP_USER}>`, ...options });
+    const verifiedSender = process.env.SMTP_FROM || process.env.SMTP_USER;
+    const result = await transport.sendMail({ from: `${senderName} <${verifiedSender}>`, ...options });
     // SMTP acceptance means queued by the provider; final delivery/bounce is confirmed in provider logs.
     console.info(`[support-email-accepted] ${context}; messageId=${result.messageId}; response=${result.response}`);
   } catch (error) {

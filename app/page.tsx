@@ -5,9 +5,9 @@ import Image from "next/image";
 import {
   Activity, AlertCircle, ArrowDownRight, ArrowRight, ArrowUpRight, Bell, Check,
   ChevronDown, ChevronLeft, ChevronRight, CircleHelp, Clock3, FilePlus2, Filter,
-  Headphones, LayoutDashboard, ListFilter, LockKeyhole, LogOut, Menu, Plus,
-  Search, Settings2, Shield, ShieldCheck, Ticket, UserCog, UserPlus, Users,
-  Wifi, X, Laptop, Mail, Cloud, MonitorCog, MoreHorizontal, CircleCheck,
+  Headphones, LayoutDashboard, ListFilter, LockKeyhole, LogOut, Menu, Pencil,
+  Plus, Search, Settings2, Shield, ShieldCheck, Ticket, UserCog, UserPlus,
+  Users, Wifi, X, Laptop, Mail, Cloud, MonitorCog, MoreHorizontal, CircleCheck,
 } from "lucide-react";
 import { CATEGORIES, PRIORITIES, REQUEST_OPTIONS, STATUSES } from "@/lib/constants";
 import { Reports } from "@/app/reports";
@@ -38,6 +38,7 @@ export default function Home() {
   const [ticketFilter, setTicketFilter] = useState("All tickets");
   const [ticketDialog, setTicketDialog] = useState<TicketRecord | "new" | null>(null);
   const [userDialog, setUserDialog] = useState(false);
+  const [editUser, setEditUser] = useState<Account | null>(null);
   const [toast, setToast] = useState("");
   const [noticeOpen, setNoticeOpen] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
@@ -144,8 +145,9 @@ export default function Home() {
         {section === "overview" && <Overview user={user} tickets={tickets} openCount={openCount} resolvedCount={resolvedCount} activeStaffCount={activeStaffCount} loading={loadingData} onViewTickets={() => setSection("tickets")} onCreate={() => setTicketDialog("new")} onSelectTicket={setTicketDialog}/>}
         {section === "tickets" && <TicketQueue tickets={filteredTickets} query={query} setQuery={setQuery} filter={ticketFilter} setFilter={setTicketFilter} admin={isAdmin} onSelect={setTicketDialog} loading={loadingData}/>}
         {section === "reports" && user.isSuperAdmin && <Reports onSelectTicket={openReportedTicket}/>}
-        {section === "users" && user.isSuperAdmin && <UserManagement users={accounts} loading={loadingData} onToggle={async (account) => { const nextActive = Number(account.active) !== 1; if (!window.confirm(`${nextActive ? "Restore" : "Deactivate"} sign-in access for ${account.name}? Their support history will be kept.`)) return; const response = await fetch(`/api/admin/users/${account.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active: nextActive }) }); const result = await response.json(); if (!response.ok) notify(result.error || "Could not update account."); else { setAccounts((rows) => rows.map((item) => item.id === account.id ? result.user : item)); void refresh(); notify(`${account.name}'s access ${nextActive ? "restored" : "removed"}.`); }}} onRoleChange={async (account, role) => { if (!window.confirm(`Change ${account.name}'s role to ${role === "admin" ? "IT administrator" : "staff member"}?`)) return; const response = await fetch(`/api/admin/users/${account.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ role }) }); const result = await response.json(); if (!response.ok) notify(result.error || "Could not change role."); else { setAccounts((rows) => rows.map((item) => item.id === account.id ? result.user : item)); void refresh(); notify(`Updated ${account.name}'s access role.`); }}}/>}
-        {section === "activity" && user.isSuperAdmin && <ActivityFeed events={events} loading={loadingData}/>}
+        {section === "users" && user.isSuperAdmin && <UserManagement users={accounts} loading={loadingData} onToggle={async (account) => { const nextActive = Number(account.active) !== 1; if (!window.confirm(`${nextActive ? "Restore" : "Deactivate"} sign-in access for ${account.name}? Their support history will be kept.`)) return; const response = await fetch(`/api/admin/users/${account.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active: nextActive }) }); const result = await response.json(); if (!response.ok) notify(result.error || "Could not update account."); else { setAccounts((rows) => rows.map((item) => item.id === account.id ? result.user : item)); void refresh(); notify(`${account.name}'s access ${nextActive ? "restored" : "removed"}.`); }}} onRoleChange={async (account, role) => { if (!window.confirm(`Change ${account.name}'s role to ${role === "admin" ? "IT administrator" : "staff member"}?`)) return; const response = await fetch(`/api/admin/users/${account.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ role }) }); const result = await response.json(); if (!response.ok) notify(result.error || "Could not change role."); else { setAccounts((rows) => rows.map((item) => item.id === account.id ? result.user : item)); void refresh(); notify(`Updated ${account.name}'s access role.`); }}} onEdit={setEditUser}/>} 
+        {section === "activity" && user.isSuperAdmin && <ActivityFeed events={events} loading={loadingData}/>} 
+        {editUser && <EditUserModal user={editUser} onClose={() => setEditUser(null)} onSaved={(updated) => { setAccounts((rows) => rows.map((item) => item.id === updated.id ? updated : item)); setEditUser(null); notify(`${updated.name}'s account was updated.`); void refresh(); }}/>}
       </div>
       <footer className="app-footer"><span><span className="footer-live-dot"/> LUMEO internal support</span><span>Private company workspace <span className="footer-lock"><LockKeyhole size={12}/></span></span></footer>
     </section>
@@ -224,7 +226,7 @@ function Pagination({ page, pageCount, total, pageSize, onChange }: { page: numb
   return <div className="pagination"><span>Showing <b>{first}–{last}</b> of <b>{total}</b></span><div><button disabled={page <= 1} onClick={() => onChange(Math.max(1,page - 1))} aria-label="Previous page"><ChevronLeft size={15}/></button><span>Page <b>{page}</b> of {pageCount}</span><button disabled={page >= pageCount} onClick={() => onChange(Math.min(pageCount,page + 1))} aria-label="Next page"><ChevronRight size={15}/></button></div></div>;
 }
 
-function UserManagement({ users, loading, onToggle, onRoleChange }: { users: Account[]; loading: boolean; onToggle: (user: Account) => void; onRoleChange: (user: Account, role: string) => void }) {
+function UserManagement({ users, loading, onToggle, onRoleChange, onEdit }: { users: Account[]; loading: boolean; onToggle: (user: Account) => void; onRoleChange: (user: Account, role: string) => void; onEdit: (user: Account) => void }) {
   const [search, setSearch] = useState(""); const [filter, setFilter] = useState("All users");
   const [page, setPage] = useState(1); const pageSize = 10;
   const filtered = users.filter((person) => `${person.name} ${person.email} ${person.department || ""}`.toLowerCase().includes(search.toLowerCase()) && (filter === "All users" || (filter === "Active" ? Number(person.active) === 1 : Number(person.active) !== 1)));
@@ -276,6 +278,30 @@ function AddUserModal({ onClose, onCreated }: { onClose: () => void; onCreated: 
     finally { setBusy(false); }
   }
   return <Dialog onClose={onClose}><div className="dialog-heading"><div><span className="dialog-kicker">WORKSPACE ACCESS</span><h2>Add a teammate</h2><p>Create a staff or IT administrator account.</p></div><button className="dialog-x" onClick={onClose}><X size={18}/></button></div><form className="add-user-form" onSubmit={submit}><label>Full name<input name="name" placeholder="Jamie Rivera" required minLength={2}/></label><label>Work email<input name="email" placeholder="jamie@company.com" type="email" required/></label><label>Account role<select name="role"><option value="staff">Staff member</option><option value="admin">IT administrator</option></select><small>Administrators can view and resolve every support ticket.</small></label><div className="request-grid"><label>Department<input name="department" placeholder="Operations"/></label><label>Job title<input name="jobTitle" placeholder="Team member"/></label></div><label>Location<input name="location" placeholder="Main office"/></label><label>Temporary password<span className="password-control"><input name="password" type={showPassword ? "text" : "password"} minLength={10} placeholder="At least 10 characters" required/><button type="button" onClick={() => setShowPassword(!showPassword)}>{showPassword ? "Hide" : "Show"}</button></span><small>Share this securely and ask the user to change it after sign-in.</small></label>{error && <div className="inline-error">{error}</div>}<div className="dialog-actions"><button type="button" className="button button-secondary" onClick={onClose}>Cancel</button><button className="button button-primary" disabled={busy}>{busy ? "Creating…" : "Create account"}<UserPlus size={15}/></button></div></form></Dialog>;
+}
+
+function EditUserModal({ user, onClose, onSaved }: { user: Account; onClose: () => void; onSaved: (user: Account) => void }) {
+  const [error, setError] = useState(""); const [busy, setBusy] = useState(false); const [showPassword, setShowPassword] = useState(false);
+  const [name, setName] = useState(user.name);
+  const [email, setEmail] = useState(user.email);
+  const [role, setRole] = useState(String(user.role));
+  const [department, setDepartment] = useState(user.department || "");
+  const [jobTitle, setJobTitle] = useState(user.jobTitle || "");
+  const [location, setLocation] = useState(user.location || "");
+  const [active, setActive] = useState(Number(user.active) === 1);
+  const [password, setPassword] = useState("");
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setBusy(true); setError("");
+    try {
+      const payload: Record<string, string | boolean> = { name, email, role, department, jobTitle, location, active };
+      if (password) payload.password = password;
+      const response = await fetch(`/api/admin/users/${user.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      const result = await response.json();
+      if (!response.ok) setError(result.error || "Could not update account."); else onSaved(result.user);
+    } catch { setError("The account service could not be reached."); }
+    finally { setBusy(false); }
+  }
+  return <Dialog onClose={onClose}><div className="dialog-heading"><div><span className="dialog-kicker">ACCOUNT DETAILS</span><h2>Edit teammate</h2><p>Update the account and optionally assign a new password.</p></div><button className="dialog-x" onClick={onClose}><X size={18}/></button></div><form className="add-user-form" onSubmit={submit}><label>Full name<input value={name} onChange={(event) => setName(event.target.value)} placeholder="Jamie Rivera" required minLength={2}/></label><label>Work email<input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="jamie@company.com" type="email" required/></label><label>Account role<select value={role} onChange={(event) => setRole(event.target.value)}><option value="staff">Staff member</option><option value="admin">IT administrator</option></select><small>Administrators can view and resolve every support ticket.</small></label><div className="request-grid"><label>Department<input value={department} onChange={(event) => setDepartment(event.target.value)} placeholder="Operations"/></label><label>Job title<input value={jobTitle} onChange={(event) => setJobTitle(event.target.value)} placeholder="Team member"/></label></div><label>Location<input value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Main office"/></label><label>Account status<select value={active ? "active" : "inactive"} onChange={(event) => setActive(event.target.value === "active")}><option value="active">Active</option><option value="inactive">Inactive</option></select><small>Inactive accounts cannot sign in.</small></label><label>New password (optional)<span className="password-control"><input value={password} onChange={(event) => setPassword(event.target.value)} type={showPassword ? "text" : "password"} minLength={10} placeholder="At least 10 characters"/><button type="button" onClick={() => setShowPassword(!showPassword)}>{showPassword ? "Hide" : "Show"}</button></span><small>Leave blank to keep the current password.</small></label>{error && <div className="inline-error">{error}</div>}<div className="dialog-actions"><button type="button" className="button button-secondary" onClick={onClose}>Cancel</button><button className="button button-primary" disabled={busy}>{busy ? "Saving…" : "Save changes"}<UserPlus size={15}/></button></div></form></Dialog>;
 }
 
 function Dialog({ children, onClose, wide = false }: { children: React.ReactNode; onClose: () => void; wide?: boolean }) {
