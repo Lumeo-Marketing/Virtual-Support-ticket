@@ -85,14 +85,10 @@ export async function notifyTicketCreated(input: { userId: number; ticket: Ticke
   await storeNotice({ userId: input.userId, ticketId: ticket.id, ticketCode: ticket.ticketCode, status: "Open", message: confirmation });
 
   const db = await getDb();
-  const rows = await db.query(`SELECT email,is_super_admin AS "isSuperAdmin" FROM users WHERE active=TRUE AND role='admin' ORDER BY is_super_admin ASC,email`);
-  const superAdminEmails = rows.rows.filter((row) => Boolean(row.isSuperAdmin)).map((row) => String(row.email).trim()).filter(Boolean);
-  const extraAdminEmails = (process.env.SUPPORT_ADMIN_EMAILS || "").split(/[;,]/).map((email) => email.trim()).filter(Boolean);
-  const superAdminSet = new Set(superAdminEmails.map((email) => email.toLowerCase()));
-  const to = [...new Set([...rows.rows.filter((row) => !Boolean(row.isSuperAdmin)).map((row) => String(row.email).trim()), ...extraAdminEmails])]
-    .filter((email) => email && !superAdminSet.has(email.toLowerCase()));
-  const recipients = to.length ? to : superAdminEmails;
-  const cc = to.length ? superAdminEmails : [];
+  const primaryAdminEmails = (process.env.SUPPORT_ADMIN_EMAILS || "moses@lumeomarketing.com").split(/[;,]/).map((email) => email.trim().toLowerCase()).filter(Boolean);
+  const ccAdminEmails = (process.env.SUPPORT_ADMIN_CC || "godwin@lumeomarketing.com").split(/[;,]/).map((email) => email.trim().toLowerCase()).filter(Boolean);
+  const recipients = [...new Set(primaryAdminEmails)];
+  const cc = [...new Set(ccAdminEmails.filter((email) => !recipients.includes(email)))];
   const adminTitle = `New support request ${ticket.ticketCode}`;
   const adminHtml = shell(adminTitle, `New ${ticket.priority} priority ${ticket.requestType.toLowerCase()} from ${ticket.fullName}.`,
     `<div style="display:inline-block;padding:5px 9px;border-radius:20px;background:#fff3e3;color:#b66b24;font-size:10px;font-weight:700;letter-spacing:.5px">NEW REQUEST&nbsp; · &nbsp;${escapeHtml(ticket.priority.toUpperCase())} PRIORITY</div><h1 style="margin:14px 0 7px;color:#202c3b;font-size:24px;line-height:1.25">${escapeHtml(ticket.subject)}</h1><p style="margin:0;color:#737f8d;font-size:12px">A new employee request is waiting in the IT support queue.</p><div style="margin-top:18px;padding:12px 14px;border-radius:8px;background:#f7f8fa"><span style="color:#7e8996;font-size:10px;text-transform:uppercase;letter-spacing:.6px">Ticket reference</span><div style="margin-top:4px;color:#b66f2c;font-size:15px;font-weight:700">${escapeHtml(ticket.ticketCode)}</div></div>${detailRows(ticket)}${descriptionBlock("Issue details", ticket.description)}${ticket.attachmentName ? `<p style="font-size:11px;color:#667382">Attachment included: <b>${escapeHtml(ticket.attachmentName)}</b> (available in the ticket workspace)</p>` : ""}${actionButton("Open ticket queue")}`);
@@ -120,3 +116,17 @@ export async function notifyTicketUpdate(input: { userId: number; ticket: Ticket
     `<div style="display:inline-block;padding:5px 9px;border-radius:20px;background:${completed ? "#eaf7f1" : "#fff3e3"};color:${color};font-size:10px;font-weight:700;letter-spacing:.4px">${escapeHtml(ticket.status.toUpperCase())}</div><h1 style="margin:14px 0 7px;color:#202c3b;font-size:23px">${escapeHtml(headline)}</h1><p style="margin:0;color:#737f8d;font-size:12px;line-height:1.6">Hi ${escapeHtml(ticket.fullName.split(" ")[0])}, our IT support team has updated your request.</p><div style="margin-top:18px;padding:14px;border:1px solid #edf0f3;border-radius:8px"><span style="color:#8d98a4;font-size:10px">${escapeHtml(ticket.ticketCode)}</span><div style="margin-top:4px;color:#2f3d4d;font-size:14px;font-weight:700">${escapeHtml(ticket.subject)}</div><p style="margin:7px 0 0;color:#6f7c8a;font-size:11px">Updated by ${escapeHtml(input.actor.name)} · ${escapeHtml(input.actor.role === "superadmin" ? "Super Administrator" : "IT Support")}</p></div>${ticket.resolution ? descriptionBlock(completed ? "Resolution" : "IT team update", ticket.resolution) : ""}${completed ? `<p style="margin:17px 0 0;color:#647181;font-size:11px;line-height:1.6">If you still need help with this issue, reply to your IT team or submit a follow-up request.</p>` : `<p style="margin:17px 0 0;color:#647181;font-size:11px;line-height:1.6">We&apos;ll let you know when there are further updates. You can also follow your request in the support workspace.</p>`}${actionButton(completed ? "View resolution" : "View request")}`);
   await deliver({ to: ticket.workEmail, replyTo: process.env.SUPPORT_REPLY_TO || process.env.SMTP_FROM || process.env.SMTP_USER, subject: `${completed ? "Request " + ticket.status.toLowerCase() : "Support update"} ${ticket.ticketCode}: ${ticket.subject}`, text: message, html: updateHtml }, `ticket update ${ticket.ticketCode} to requester`);
 }
+
+export async function notifyMessage(input: { recipientId: number; recipientEmail: string; senderName: string; senderRole: string; content: string }) {
+  const notice = input.content.length > 160 ? `${input.content.slice(0, 157)}...` : input.content;
+  const db = await getDb();
+  await db.query("INSERT INTO notifications (user_id,title,message,created_at) VALUES ($1,$2,$3,NOW())", [input.recipientId, `New message from ${input.senderName}`, `${input.senderRole}: ${notice}`]);
+  await deliver({
+    to: input.recipientEmail,
+    replyTo: process.env.SUPPORT_REPLY_TO || process.env.SMTP_FROM || process.env.SMTP_USER,
+    subject: `New message from ${input.senderName} · LUMEO support`,
+    text: `${input.senderName} (${input.senderRole}) sent you a message:\n\n${input.content}`,
+    html: shell("New message from LUMEO support", "You have a new message in the support workspace.", `<div style="display:inline-block;padding:5px 9px;border-radius:20px;background:#fff3e3;color:#b66b24;font-size:10px;font-weight:700;letter-spacing:.4px">NEW MESSAGE</div><h1 style="margin:14px 0 7px;color:#202c3b;font-size:23px">${escapeHtml(input.senderName)} sent you a message</h1><p style="margin:0;color:#737f8d;font-size:12px;line-height:1.6">Open the support workspace to read and reply.</p><div style="margin-top:18px;padding:14px;border:1px solid #edf0f3;border-radius:8px;background:#fafbfc;color:#465363;font-size:12px;line-height:1.65;white-space:pre-wrap">${escapeHtml(input.content)}</div>${actionButton("Open messages")}`),
+  }, `message notification to ${input.recipientEmail}`);
+}
+

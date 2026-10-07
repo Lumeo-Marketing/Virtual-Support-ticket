@@ -5,7 +5,7 @@ import { getDb, logActivity } from "@/lib/db";
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   const actor = await getCurrentUser();
-  if (!actor?.isSuperAdmin) return NextResponse.json({ error: "Super administrator access required." }, { status: 403 });
+  if (!actor || (actor.role !== "admin" && !actor.isSuperAdmin)) return NextResponse.json({ error: "Administrator access required." }, { status: 403 });
   const { id: rawId } = await context.params;
   const id = Number(rawId);
   if (!Number.isInteger(id) || id < 1) return NextResponse.json({ error: "Invalid account." }, { status: 400 });
@@ -14,6 +14,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const target = result.rows[0] as { id: number; name: string; email: string; role: string; department: string | null; jobTitle: string | null; location: string | null; active: boolean; isSuperAdmin: boolean } | undefined;
   if (!target) return NextResponse.json({ error: "Account not found." }, { status: 404 });
   if (target.isSuperAdmin) return NextResponse.json({ error: "Super-admin accounts cannot be changed here." }, { status: 409 });
+  const canManageAccountState = actor.isSuperAdmin;
   try {
     const body = await request.json();
     const nextName = typeof body.name === "string" ? body.name.trim() : target.name;
@@ -22,12 +23,14 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const nextDepartment = typeof body.department === "string" ? body.department.trim() : target.department || null;
     const nextJobTitle = typeof body.jobTitle === "string" ? body.jobTitle.trim() : target.jobTitle || null;
     const nextLocation = typeof body.location === "string" ? body.location.trim() : target.location || null;
-    const nextActive = typeof body.active === "boolean" ? body.active : target.active;
+    const nextActive = canManageAccountState && typeof body.active === "boolean" ? body.active : target.active;
     const rawPassword = typeof body.password === "string" ? body.password : "";
 
     if (nextName.length < 2) return NextResponse.json({ error: "Name must be at least 2 characters." }, { status: 400 });
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nextEmail)) return NextResponse.json({ error: "Enter a valid work email." }, { status: 400 });
+    if (!canManageAccountState && nextRole !== target.role) return NextResponse.json({ error: "Only super administrators can change roles." }, { status: 403 });
     if (!["staff", "admin"].includes(nextRole)) return NextResponse.json({ error: "Role must be staff or admin." }, { status: 400 });
+    if (!canManageAccountState && typeof body.active !== "undefined") return NextResponse.json({ error: "Only super administrators can activate or deactivate accounts." }, { status: 403 });
     if (rawPassword && rawPassword.length < 10) return NextResponse.json({ error: "Password must be at least 10 characters." }, { status: 400 });
 
     const updates: string[] = [];

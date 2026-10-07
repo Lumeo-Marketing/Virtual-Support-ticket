@@ -111,6 +111,14 @@ async function initializeDatabase() {
         read_at TIMESTAMPTZ,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
+      CREATE TABLE IF NOT EXISTS messages (
+        id BIGSERIAL PRIMARY KEY,
+        sender_id BIGINT NOT NULL REFERENCES users(id),
+        recipient_id BIGINT NOT NULL REFERENCES users(id),
+        content TEXT NOT NULL,
+        read_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
       CREATE TABLE IF NOT EXISTS activity_events (
         id BIGSERIAL PRIMARY KEY,
         actor_id BIGINT,
@@ -126,11 +134,23 @@ async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS tickets_user_id_idx ON tickets(user_id);
       CREATE INDEX IF NOT EXISTS tickets_status_idx ON tickets(status);
       CREATE INDEX IF NOT EXISTS notifications_user_id_idx ON notifications(user_id,read_at);
+      CREATE INDEX IF NOT EXISTS messages_participants_idx ON messages(sender_id,recipient_id,created_at DESC);
+      CREATE INDEX IF NOT EXISTS messages_recipient_idx ON messages(recipient_id,read_at);
       CREATE INDEX IF NOT EXISTS activity_events_created_idx ON activity_events(id DESC);
     `);
     await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT TRUE");
     await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_super_admin BOOLEAN NOT NULL DEFAULT FALSE");
     await client.query("ALTER TABLE tickets ADD COLUMN IF NOT EXISTS attachment_data BYTEA");
+    await client.query(`CREATE TABLE IF NOT EXISTS messages (
+      id BIGSERIAL PRIMARY KEY,
+      sender_id BIGINT NOT NULL REFERENCES users(id),
+      recipient_id BIGINT NOT NULL REFERENCES users(id),
+      content TEXT NOT NULL,
+      read_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+    await client.query("CREATE INDEX IF NOT EXISTS messages_participants_idx ON messages(sender_id,recipient_id,created_at DESC)");
+    await client.query("CREATE INDEX IF NOT EXISTS messages_recipient_idx ON messages(recipient_id,read_at)");
     await seedUser(client, { name: "Moses Effiom", email: process.env.ADMIN_EMAIL || "admin@lumeo.com", password: process.env.ADMIN_PASSWORD || "Admin123!", role: "admin", department: "IT", jobTitle: "IT Administrator" });
     await seedUser(client, { name: "Alex Morgan", email: process.env.STAFF_EMAIL || "staff@lumeo.com", password: process.env.STAFF_PASSWORD || "Staff123!", role: "staff", department: "Operations", jobTitle: "Operations Associate" });
     const owner = await seedUser(client, { name: "LUMEO Owner", email: process.env.SUPER_ADMIN_EMAIL || "owner@lumeo.com", password: process.env.SUPER_ADMIN_PASSWORD || "Owner123!", role: "admin", department: "IT", jobTitle: "Super Administrator" });

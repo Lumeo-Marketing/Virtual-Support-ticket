@@ -9,7 +9,7 @@ function csvCell(value: unknown) {
 
 export async function GET(request: Request) {
   const user = await getCurrentUser();
-  if (!user?.isSuperAdmin) return NextResponse.json({ error: "Super administrator access required." }, { status: 403 });
+  if (!user || (user.role !== "admin" && !user.isSuperAdmin)) return NextResponse.json({ error: "Administrator access required." }, { status: 403 });
   const url = new URL(request.url);
   const q = (url.searchParams.get("q") || "").trim();
   const status = (url.searchParams.get("status") || "").trim();
