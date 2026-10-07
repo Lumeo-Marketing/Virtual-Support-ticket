@@ -154,6 +154,8 @@ async function initializeDatabase() {
     await seedUser(client, { name: "Moses Effiom", email: process.env.ADMIN_EMAIL || "admin@lumeo.com", password: process.env.ADMIN_PASSWORD || "Admin123!", role: "admin", department: "IT", jobTitle: "IT Administrator" });
     await seedUser(client, { name: "Alex Morgan", email: process.env.STAFF_EMAIL || "staff@lumeo.com", password: process.env.STAFF_PASSWORD || "Staff123!", role: "staff", department: "Operations", jobTitle: "Operations Associate" });
     const owner = await seedUser(client, { name: "LUMEO Owner", email: process.env.SUPER_ADMIN_EMAIL || "owner@lumeo.com", password: process.env.SUPER_ADMIN_PASSWORD || "Owner123!", role: "admin", department: "IT", jobTitle: "Super Administrator" });
+    await client.query(`UPDATE users SET name=$1
+      WHERE LOWER(email)=$2 AND name=$3`, ["Godwin", "godwin@lumeomarketing.com", "LUMEO Owner"]);
     await client.query("UPDATE users SET is_super_admin=FALSE WHERE id<>$1 AND is_super_admin=TRUE", [owner.id]);
     await client.query("UPDATE users SET is_super_admin=TRUE,password_hash=$2,active=TRUE WHERE id=$1", [owner.id, bcrypt.hashSync(process.env.SUPER_ADMIN_PASSWORD || "Owner123!", 12)]);
     await client.query("COMMIT");

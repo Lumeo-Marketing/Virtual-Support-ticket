@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Activity, AlertCircle, CalendarDays, ChevronLeft, ChevronRight, Download, Search } from "lucide-react";
+import { Activity, CalendarDays, ChevronLeft, ChevronRight, Download, Search } from "lucide-react";
+import { ErrorAlert, Spinner } from "./alerts";
 import { CATEGORIES, PRIORITIES, STATUSES } from "@/lib/constants";
 
 type ReportTicket = {
@@ -37,6 +38,7 @@ export function Reports({ onSelectTicket }: { onSelectTicket: (id: number) => vo
   const [agentPage, setAgentPage] = useState(1);
   const [data, setData] = useState<Bundle | null>(null);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState<"csv" | "activity-csv" | null>(null);
   const [error, setError] = useState("");
   const query = useMemo(() => new URLSearchParams({ q: search, status, category, priority, assignee, from, to, page: String(page), activityPage: String(activityPage), pageSize: "10" }).toString(), [search, status, category, priority, assignee, from, to, page, activityPage]);
 
@@ -63,6 +65,9 @@ export function Reports({ onSelectTicket }: { onSelectTicket: (id: number) => vo
     setAgentPage(1);
   }
   async function exportCsv(kind: "csv" | "activity-csv") {
+    if (exporting) return;
+    setExporting(kind);
+    setError("");
     try {
       const response = await fetch(`/api/admin/reports?${query}&export=${kind}`);
       if (!response.ok) throw new Error("Export request failed");
@@ -75,7 +80,7 @@ export function Reports({ onSelectTicket }: { onSelectTicket: (id: number) => vo
       URL.revokeObjectURL(href);
     } catch {
       setError("Could not export this report. Please try again.");
-    }
+    } finally { setExporting(null); }
   }
   const maxMonth = Math.max(1, ...(data?.monthly || []).map((item) => item.opened));
 
@@ -90,8 +95,8 @@ export function Reports({ onSelectTicket }: { onSelectTicket: (id: number) => vo
       <label><span>To</span><input type="date" value={to} onChange={(event) => applyFilter(setTo, event.target.value)}/></label>
       <button className="filter-reset" onClick={() => { setSearch(""); setStatus(""); setCategory(""); setPriority(""); setAssignee(""); setFrom(""); setTo(""); setPage(1); setActivityPage(1); setAgentPage(1); }}>Reset</button>
     </div>
-    <div className="report-export-row"><span><CalendarDays size={15}/>{from || to ? `${from || "Beginning"} — ${to || "Today"}` : "All recorded support history"}{loading && <i>Refreshing…</i>}</span><div><button className="button button-secondary" onClick={() => void exportCsv("activity-csv")}><Download size={15}/> Export activity CSV</button><button className="button button-primary" onClick={() => void exportCsv("csv")}><Download size={15}/> Export ticket report</button></div></div>
-    {error && <div className="report-error"><AlertCircle size={16}/>{error}</div>}
+    <div className="report-export-row"><span><CalendarDays size={15}/>{from || to ? `${from || "Beginning"} — ${to || "Today"}` : "All recorded support history"}{loading && <i>Refreshing…</i>}</span><div><button className="button button-secondary" disabled={exporting !== null} aria-busy={exporting === "activity-csv"} onClick={() => void exportCsv("activity-csv")}>{exporting === "activity-csv" ? <Spinner/> : <Download size={15}/>} {exporting === "activity-csv" ? "Exporting…" : "Export activity CSV"}</button><button className="button button-primary" disabled={exporting !== null} aria-busy={exporting === "csv"} onClick={() => void exportCsv("csv")}>{exporting === "csv" ? <Spinner/> : <Download size={15}/>} {exporting === "csv" ? "Exporting…" : "Export ticket report"}</button></div></div>
+    <ErrorAlert message={error} onClose={() => setError("")}/>
     {!data && loading ? <div className="content-card table-loading">Loading reporting data…</div> : data && <>
       <div className="report-kpis">
         <ReportKpi label="Matching requests" value={data.summary.total} detail="Tickets in selected view" tone="orange"/>

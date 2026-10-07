@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { DismissibleErrorAlert, ErrorAlert, Spinner, useAlerts } from "./alerts";
 import { Mail, Search, Send, ArrowLeft, Plus } from "lucide-react";
 
 export type Message = { id: number; senderId: number; recipientId: number; content: string; createdAt: string; senderName: string; senderEmail: string; senderRole: string; senderIsSuperAdmin?: boolean; senderActive?: boolean; recipientName: string; recipientEmail: string; recipientRole?: string; recipientIsSuperAdmin?: boolean; recipientActive?: boolean; readAt: string | null };
@@ -11,6 +12,7 @@ const initials = (name: string) => name.split(/\s+/).slice(0, 2).map((part) => p
 const stamp = (date: string) => new Date(date).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
 export function MessagesWorkspace({ user, messages, recipients, loadError, onSent, onRead }: Props) {
+  const { show } = useAlerts();
   const [selectedId, setSelectedId] = useState(0);
   const [search, setSearch] = useState("");
   const [unreadOnly, setUnreadOnly] = useState(false);
@@ -68,12 +70,13 @@ export function MessagesWorkspace({ user, messages, recipients, loadError, onSen
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Could not send your message.");
       onSent({ ...result.message, content: text, senderName: user.name, senderEmail: user.email, senderRole: user.role, senderIsSuperAdmin: user.isSuperAdmin, recipientName: recipient.name, recipientEmail: recipient.email, recipientRole: recipient.role, recipientIsSuperAdmin: recipient.isSuperAdmin, readAt: null });
+      show("Your message was sent.");
       setDrafts((values) => ({ ...values, [recipient.id]: "" }));
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not send your message. Try again."); }
     finally { setBusy(false); }
   }
   return <>
-    {loadError && <p className="inline-error" role="status">{loadError}</p>}
+    <DismissibleErrorAlert message={loadError}/>
     <section className={`messaging-workspace ${selected ? "has-conversation" : ""}`} aria-label="Team messages">
       <aside className="conversation-sidebar">
         <div className="conversation-title"><h2>Conversations</h2><button className="button button-secondary" title="Start a conversation" onClick={() => picker.current?.focus()}><Plus size={16}/> New</button></div>
@@ -85,7 +88,7 @@ export function MessagesWorkspace({ user, messages, recipients, loadError, onSen
       <div className="conversation-panel">{selected ? <>
         <header className="conversation-header"><button className="conversation-back" aria-label="Back to conversations" onClick={() => select(0)}><ArrowLeft size={20}/></button><span className="conversation-avatar">{initials(selected.name)}</span><div><h2>{selected.name}</h2><p>{roleLabel(selected)} · {selected.email}</p></div></header>
         <div className="conversation-history" role="log" aria-label={`Conversation with ${selected.name}`} aria-live="polite">{thread.length ? thread.map((message, index) => <div key={message.id}>{(index === 0 || new Date(thread[index - 1].createdAt).toDateString() !== new Date(message.createdAt).toDateString()) && <div className="conversation-date">{new Date(message.createdAt).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}</div>}<article className={`message-bubble ${message.senderId === user.id ? "outgoing" : "incoming"}`}><b>{message.senderId === user.id ? "You" : message.senderName}</b><p>{message.content}</p><small><time dateTime={message.createdAt}>{stamp(message.createdAt)}</time>{message.senderId === user.id && <span> · {message.readAt ? "Read" : "Sent"}</span>}</small></article></div>) : <div className="messaging-empty"><Mail size={32}/><b>Say hello to {selected.name.split(" ")[0]}</b><p>Your messages and replies will appear here.</p></div>}<div ref={bottom}/></div>
-        <form className="conversation-compose" onSubmit={send}><label htmlFor="message-content">{selected.active ? `Message ${selected.name.split(" ")[0]}` : "This account is inactive. Conversation history is still available."}</label><textarea id="message-content" rows={3} maxLength={5000} placeholder="Write your message…" value={content} disabled={!selected.active || busy} onChange={(event) => setDrafts((values) => ({ ...values, [selectedId]: event.target.value }))}/>{error && <p className="inline-error" role="alert">{error}</p>}<div><small>{content.length.toLocaleString()} / 5,000</small><button className="button button-primary" disabled={busy || !content.trim() || !selected.active}><Send size={16}/>{busy ? "Sending…" : "Send message"}</button></div></form>
+        <form className="conversation-compose" onSubmit={send}><label htmlFor="message-content">{selected.active ? `Message ${selected.name.split(" ")[0]}` : "This account is inactive. Conversation history is still available."}</label><textarea id="message-content" rows={3} maxLength={5000} placeholder="Write your message…" value={content} disabled={!selected.active || busy} onChange={(event) => setDrafts((values) => ({ ...values, [selectedId]: event.target.value }))}/><ErrorAlert message={error} onClose={() => setError("")}/><div><small>{content.length.toLocaleString()} / 5,000</small><button className="button button-primary" disabled={busy || !content.trim() || !selected.active} aria-busy={busy}>{busy ? <Spinner/> : <Send size={16}/>} {busy ? "Sending…" : "Send message"}</button></div></form>
       </> : <div className="messaging-empty messaging-welcome"><span><Mail size={36}/></span><h2>Your team, one conversation away</h2><p>Select a conversation to read and reply, or choose a team member to start a new one.</p><button className="button button-primary" onClick={() => picker.current?.focus()}><Plus size={17}/> New conversation</button></div>}</div>
     </section>
   </>;

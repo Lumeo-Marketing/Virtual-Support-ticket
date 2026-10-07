@@ -1,0 +1,34 @@
+.centered-alert {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: min(520px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  border: 1px solid #e4e8ef;
+  border-radius: 22px;
+  padding: 38px 34px 32px;
+  background: #fff;
+  color: #283547;
+  text-align: center;
+  box-shadow: 0 28px 100px #101c3455;
+}
+.centered-alert[open] { animation: alert-enter .18s ease-out; }
+.centered-alert::backdrop { background: #111c2b99; backdrop-filter: blur(4px); }
+.alert-symbol { width: 90px; height: 90px; margin: 0 auto 22px; display: grid; place-items: center; border-radius: 50%; background: #fff0ee; color: #bd4c43; }
+.alert-success .alert-symbol { background: #eaf7f1; color: #24956b; }
+.alert-warning .alert-symbol { background: #fff3e3; color: #b76a22; }
+.alert-info .alert-symbol { background: #edf4ff; color: #527fc3; }
+.centered-alert h2 { margin: 0 0 14px; font-size: 28px; font-weight: 750; line-height: 1.25; letter-spacing: -.6px; }
+.centered-alert p { margin: 0; color: #526176; font-size: 16px; line-height: 1.7; overflow-wrap: anywhere; white-space: pre-wrap; }
+.alert-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 28px; }
+.alert-actions .button { min-height: 46px; min-width: 130px; padding: 0 22px; font-size: 15px; border-radius: 10px; }
+.centered-alert button:focus-visible { outline: 3px solid #df892f; outline-offset: 4px; }
+.button-spinner { flex-shrink: 0; animation: button-spin .8s linear infinite; }
+button[aria-busy=true] { cursor: wait; }
+button:disabled { cursor: not-allowed; }
+.button:disabled,.login-submit:disabled,.access-action:disabled { opacity: .65; transform: none; }
+@keyframes button-spin { to { transform: rotate(360deg); } }
+@keyframes alert-enter { from { opacity: 0; transform: scale(.95); } to { opacity: 1; transform: scale(1); } }
+@media(max-width:600px) { .centered-alert { padding: 30px 22px 26px; border-radius: 18px; } .centered-alert h2 { font-size: 24px; } .centered-alert p { font-size: 15px; } }
+@media(prefers-reduced-motion:reduce) { .centered-alert[open],.button-spinner { animation: none; } }
