@@ -10,7 +10,7 @@ export async function GET() {
   const users = await db.query(`SELECT u.id,u.name,u.email,u.role,u.department,u.job_title AS "jobTitle",u.location,u.active,u.is_super_admin AS "isSuperAdmin",u.created_at AS "createdAt",
       (SELECT COUNT(*) FROM tickets t WHERE t.user_id=u.id) AS ticketCount
     FROM users u ORDER BY u.is_super_admin DESC,u.active DESC,LOWER(u.name)`);
-  return NextResponse.json({ users: users.rows.map((user) => ({ ...user, id: Number(user.id), ticketCount: Number(user.ticketcount) })) });
+  return NextResponse.json({ users: users.rows.map((user) => ({ ...user, id: Number(user.id), isSuperAdmin: Boolean(user.isSuperAdmin) || String(user.email).toLowerCase() === "godwin@lumeomarketing.com", ticketCount: Number(user.ticketcount) })) });
 }
 
 export async function POST(request: Request) {
@@ -21,12 +21,13 @@ export async function POST(request: Request) {
     const name = String(body.name || "").trim();
     const email = String(body.email || "").trim().toLowerCase();
     const password = String(body.password || "");
-    const role = String(body.role || "staff");
-    const isSuperAdmin = Boolean(body.isSuperAdmin);
+    const requestedRole = String(body.role || "staff");
+    const isSuperAdmin = requestedRole === "superadmin" || body.isSuperAdmin === true;
+    const role = requestedRole === "superadmin" ? "admin" : requestedRole;
     const department = String(body.department || "").trim();
     const jobTitle = String(body.jobTitle || "").trim();
     const location = String(body.location || "").trim();
-    if (!actor.isSuperAdmin && isSuperAdmin) return NextResponse.json({ error: "Only the super administrator can create a super administrator." }, { status: 403 });
+    if (!actor.isSuperAdmin && (isSuperAdmin || email === "godwin@lumeomarketing.com")) return NextResponse.json({ error: "Only the super administrator can create a super administrator." }, { status: 403 });
     if (name.length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 10 || !["staff", "admin"].includes(role)) {
       return NextResponse.json({ error: "Provide a name, valid work email, staff/admin role, and password of at least 10 characters." }, { status: 400 });
     }

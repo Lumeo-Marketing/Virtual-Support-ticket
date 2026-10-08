@@ -37,7 +37,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const ticket = asTicket(row);
     if (status !== prior.status || resolution !== prior.resolution) {
       await logActivity(user, "updated ticket", "ticket", ticket.id, `${ticket.ticketCode}: ${prior.status} → ${status}${resolution ? `; resolution updated` : ""}`);
-      await notifyTicketUpdate({ userId: Number(prior.user_id), ticket, previousStatus: String(prior.status), actor: user });
+      if (prior.user_id != null) await notifyTicketUpdate({ userId: Number(prior.user_id), ticket, previousStatus: String(prior.status), actor: user });
     }
     return NextResponse.json({ ticket });
   } catch {

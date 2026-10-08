@@ -6,22 +6,24 @@ import { ErrorAlert, Spinner, useAlerts } from "./alerts";
 import { usePathname } from "next/navigation";
 import { MessagesWorkspace, type Message, type Recipient } from "./messages-workspace";
 import {
-  Activity, AlertCircle, ArrowDownRight, ArrowRight, ArrowUpRight, Bell, Check,
-  ChevronDown, ChevronLeft, ChevronRight, CircleHelp, Clock3, FilePlus2, Filter,
-  Headphones, LayoutDashboard, ListFilter, LockKeyhole, LogOut, Menu, Pencil,
+  Activity, AlertCircle, ArrowDownRight, ArrowRight, ArrowUpRight, Bell, BookOpen, Check,
+  ChevronDown, ChevronLeft, ChevronRight, CircleHelp, Clock3, FilePlus2, FileText, Filter,
+  Headphones, LayoutDashboard, ListFilter, LockKeyhole, LogOut, Menu, Pencil, PlayCircle,
   Plus, Search, Settings2, Shield, ShieldCheck, Ticket, UserCog, UserPlus,
-  Users, Wifi, X, Laptop, Mail, Cloud, MonitorCog, MoreHorizontal, CircleCheck,
+  Users, Video, Wifi, X, Laptop, Mail, Cloud, MonitorCog, MoreHorizontal, CircleCheck,
 } from "lucide-react";
 import { CATEGORIES, PRIORITIES, REQUEST_OPTIONS, STATUSES } from "@/lib/constants";
 import { Reports } from "@/app/reports";
+import { KnowledgeBaseWorkspace } from "@/app/knowledge-base";
 
 type Role = "staff" | "admin" | "superadmin";
 type User = { id: number; name: string; email: string; role: Role; department: string | null; jobTitle: string | null; location: string | null; active: boolean; isSuperAdmin: boolean };
-type TicketRecord = { id: number; ticketCode: string; userId: number; fullName: string; workEmail: string; department: string; jobTitle: string; location: string; requestType: string; requestSubtype: string; category: string; priority: string; subject: string; description: string; attachmentPath: string | null; attachmentName: string | null; resolution: string; status: string; createdAt: string; resolvedAt: string | null; updatedAt: string };
+type TicketRecord = { id: number; ticketCode: string; userId: number | null; fullName: string; workEmail: string; department: string; jobTitle: string; location: string; requestType: string; requestSubtype: string; category: string; priority: string; subject: string; description: string; attachmentPath: string | null; attachmentName: string | null; resolution: string; status: string; createdAt: string; resolvedAt: string | null; updatedAt: string };
 type Account = { id: number; name: string; email: string; role: string; department: string | null; jobTitle: string | null; location: string | null; active: boolean | number; isSuperAdmin: boolean | number; createdAt: string; ticketCount?: number };
 type Event = { id: number; actorId: number | null; actorName: string; actorEmail: string; actorRole: Role; action: string; entityType: string; entityId: string | null; details: string; createdAt: string };
 type Notice = { id: number; title: string; message: string; createdAt: string; readAt: string | null };
-type Section = "overview" | "tickets" | "users" | "activity" | "reports" | "messages";
+type KnowledgeEntry = { id: number; title: string; description: string; contentType: "text" | "pdf" | "video" | "youtube"; createdAt: string; updatedAt: string; createdBy: string };
+type Section = "overview" | "tickets" | "knowledge-base" | "users" | "activity" | "reports" | "messages";
 
 const statusClass = (status: string) => status.toLowerCase().replaceAll(" ", "-");
 const dateLabel = (date: string) => new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -145,6 +147,21 @@ export default function Home() {
     finally { setAccountBusy(null); }
   }
 
+  async function deleteAccount(account: Account) {
+    if (accountBusy !== null || !user?.isSuperAdmin) return;
+    if (!await confirm(`Delete ${account.name} (${account.email}) permanently? Their messages and notifications will be removed. Tickets, guides, and audit history will be kept.`)) return;
+    setAccountBusy(account.id);
+    try {
+      const response = await fetch(`/api/admin/users/${account.id}`, { method: "DELETE" });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Could not delete account.");
+      setAccounts((rows) => rows.filter((item) => item.id !== account.id));
+      notify(`${account.name}'s account was deleted.`);
+      if (account.id === user.id) await signOut(); else await refresh();
+    } catch (error) { notify(error instanceof Error ? error.message : "Could not delete account.", "error"); }
+    finally { setAccountBusy(null); }
+  }
+
   async function handleLogin(nextUser: User) {
     setUser(nextUser);
     await loadData(nextUser);
@@ -158,7 +175,13 @@ export default function Home() {
     setUnread(0);
   }
   async function refresh() {
-    if (user) await loadData(user);
+    if (user) {
+      const response = await fetch("/api/auth/me");
+      const data = await response.json();
+      if (!data.user) { await signOut(); return; }
+      setUser(data.user);
+      await loadData(data.user);
+    }
   }
   async function openReportedTicket(id: number) {
     try {
@@ -181,6 +204,7 @@ export default function Home() {
       <nav className="side-nav">
         <SideItem active={section === "overview"} icon={<LayoutDashboard size={17}/>} label="Overview" onClick={() => { setSection("overview"); setMobileNav(false); }}/>
         <SideItem active={section === "tickets"} icon={<Ticket size={17}/>} label={isAdmin ? "Ticket queue" : "My requests"} count={isAdmin ? openCount : tickets.length} onClick={() => { setSection("tickets"); setMobileNav(false); }}/>
+        <SideItem active={section === "knowledge-base"} icon={<BookOpen size={17}/>} label="Knowledge base" onClick={() => { setSection("knowledge-base"); setMobileNav(false); }}/>
         <SideItem active={section === "messages"} icon={<Mail size={18}/>} label="Messages" count={unreadMessages} onClick={() => { setSection("messages"); setMobileNav(false); }}/>
       </nav>
       {user.role !== "staff" && <><p className="nav-label nav-gap">ADMINISTRATION</p><nav className="side-nav"><SideItem active={section === "reports"} icon={<Activity size={17}/>} label="Reports & analytics" onClick={() => { setSection("reports"); setMobileNav(false); }}/><SideItem active={section === "users"} icon={<Users size={17}/>} label="People & access" onClick={() => { setSection("users"); setMobileNav(false); }}/>{user.isSuperAdmin && <SideItem active={section === "activity"} icon={<Activity size={17}/>} label="Activity log" onClick={() => { setSection("activity"); setMobileNav(false); }}/>}</nav></>}
@@ -195,9 +219,10 @@ export default function Home() {
         <div className="page-heading"><div><div className="date-kicker">{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }).toUpperCase()}</div><h1>{heading(section, user)}</h1><p>{subheading(section, user)}</p></div><div className="heading-actions">{section === "tickets" && <button className="button button-secondary" onClick={() => void refresh()} disabled={loadingData} aria-busy={loadingData}>{loadingData ? <Spinner/> : <Settings2 size={16}/>} {loadingData ? "Refreshing…" : "Refresh"}</button>}{section !== "messages" && section !== "users" && section !== "activity" && section !== "reports" && <button className="button button-primary" onClick={() => setTicketDialog("new")}><Plus size={17}/>{user.role === "staff" ? "New support request" : "Create ticket"}</button>}{user.role !== "staff" && section === "users" && <button className="button button-primary" onClick={() => setUserDialog(true)}><UserPlus size={17}/> Add a user</button>}</div></div>
 
         {section === "messages" && <MessagesWorkspace user={user} messages={messages} recipients={recipients} loadError={messagingError} onSent={(message) => setMessages((rows) => [message, ...rows])} onRead={markMessagesRead}/>}
-        {section === "overview" && <Overview user={user} tickets={tickets} openCount={openCount} resolvedCount={resolvedCount} activeStaffCount={activeStaffCount} loading={loadingData} onViewTickets={() => setSection("tickets")} onCreate={() => setTicketDialog("new")} onSelectTicket={setTicketDialog}/>} 
-        {section === "tickets" && <TicketQueue tickets={filteredTickets} query={query} setQuery={setQuery} filter={ticketFilter} setFilter={setTicketFilter} admin={isAdmin} onSelect={setTicketDialog} loading={loadingData}/>} 
-        {section === "reports" && user.role !== "staff" && <Reports onSelectTicket={openReportedTicket}/>} 
+        {section === "overview" && <Overview user={user} tickets={tickets} openCount={openCount} resolvedCount={resolvedCount} activeStaffCount={activeStaffCount} loading={loadingData} onViewTickets={() => setSection("tickets")} onCreate={() => setTicketDialog("new")} onOpenKnowledgeBase={() => setSection("knowledge-base")} onSelectTicket={setTicketDialog}/>}
+        {section === "tickets" && <TicketQueue tickets={filteredTickets} query={query} setQuery={setQuery} filter={ticketFilter} setFilter={setTicketFilter} admin={isAdmin} onSelect={setTicketDialog} loading={loadingData}/>}
+        {section === "knowledge-base" && <KnowledgeBaseWorkspace isAdmin={isAdmin} />}
+        {section === "reports" && user.role !== "staff" && <Reports onSelectTicket={openReportedTicket}/>}
         {section === "users" && user.role !== "staff" && <UserManagement users={accounts} loading={loadingData} busyId={accountBusy} isSuperAdmin={user.isSuperAdmin} onToggle={async (account) => {
           if (!user.isSuperAdmin) { notify("Only the super administrator can change account access.", "error"); return; }
           const nextActive = Number(account.active) !== 1;
@@ -207,9 +232,9 @@ export default function Home() {
           if (!user.isSuperAdmin) { notify("Only the super administrator can change roles.", "error"); return; }
           if (!await confirm(`Change ${account.name}'s role to ${role === "admin" ? "IT administrator" : "staff member"}?`)) return;
           await updateAccount(account, { role }, `Updated ${account.name}'s access role.`);
-        }} onEdit={setEditUser}/>}
-        {section === "activity" && user.isSuperAdmin && <ActivityFeed events={events} loading={loadingData}/>} 
-        {editUser && (user.isSuperAdmin || user.role === "admin") && <EditUserModal user={editUser} onClose={() => setEditUser(null)} onSaved={(updated) => { setAccounts((rows) => rows.map((item) => item.id === updated.id ? updated : item)); setEditUser(null); notify(`${updated.name}'s account was updated.`); void refresh(); }}/>}
+        }} onEdit={setEditUser} onDelete={deleteAccount}/>}
+        {section === "activity" && user.isSuperAdmin && <ActivityFeed events={events} loading={loadingData}/>}
+        {editUser && (user.isSuperAdmin || user.role === "admin") && <EditUserModal canManageAccess={user.isSuperAdmin} user={editUser} onClose={() => setEditUser(null)} onSaved={(updated) => { setAccounts((rows) => rows.map((item) => item.id === updated.id ? updated : item)); setEditUser(null); notify(`${updated.name}'s account was updated.`); void refresh(); }}/>}
       </div>
       <footer className="app-footer"><span><span className="footer-live-dot"/> LUMEO internal support</span><span>Private company workspace <span className="footer-lock"><LockKeyhole size={12}/></span></span></footer>
     </section>
@@ -221,6 +246,7 @@ export default function Home() {
 function sectionTitle(section: Section, admin: boolean) {
   if (section === "messages") return "Messages";
   if (section === "tickets") return admin ? "Ticket queue" : "My requests";
+  if (section === "knowledge-base") return "Knowledge base";
   if (section === "users") return "People & access";
   if (section === "activity") return "Activity log";
   if (section === "reports") return "Reports & analytics";
@@ -229,6 +255,7 @@ function sectionTitle(section: Section, admin: boolean) {
 function heading(section: Section, user: User) {
   if (section === "messages") return "Messages";
   if (section === "tickets") return user.role === "staff" ? "My support requests" : "Support ticket queue";
+  if (section === "knowledge-base") return "Knowledge base";
   if (section === "users") return "People & access";
   if (section === "activity") return "Workspace activity";
   if (section === "reports") return "Support performance reports";
@@ -237,6 +264,7 @@ function heading(section: Section, user: User) {
 function subheading(section: Section, user: User) {
   if (section === "messages") return "Talk to your team. Every conversation and reply, in one place.";
   if (section === "tickets") return user.role === "staff" ? "Track your requests and see the latest updates from IT." : "Review, assign and resolve requests from across the team.";
+  if (section === "knowledge-base") return "Find guides, files, and videos created by your IT administrators.";
   if (section === "users") return "Create staff and administrator accounts and manage workspace access.";
   if (section === "activity") return "A persistent audit trail of account and ticket activity across the workspace.";
   if (section === "reports") return "Resolution times, workload, status trends, and the underlying ticket and activity records.";
@@ -262,12 +290,40 @@ function LoginScreen({ onLogin }: { onLogin: (user: User) => Promise<void> }) {
   return <main className="login-screen"><div className="login-art"><div className="art-grid"/><div className="art-brand"><Image src="/lumeo-symbol.svg" width={36} height={36} alt=""/><span>LUMEO</span></div><div className="art-content"><span className="art-overline"><span/> INTERNAL IT WORKSPACE</span><h1>Support that<br/>keeps work<br/><em>moving.</em></h1><p>Your team&apos;s secure home for IT help, service requests, and account support.</p><div className="art-bottom"><div className="art-icon-row"><span><ShieldCheck size={16}/></span><span><Ticket size={16}/></span><span><Users size={16}/></span></div><small>One workspace. Better support.</small></div></div><div className="art-glow art-glow-one"/><div className="art-glow art-glow-two"/></div><div className="login-panel"><div className="login-mobile-brand"><Image src="/lumeo-symbol.svg" width={30} height={30} alt=""/><b>LUMEO</b><span>SUPPORT</span></div><div className="login-card"><div className="login-badge"><LockKeyhole size={18}/></div><div className="login-eyebrow">EMPLOYEE SIGN IN</div><h2>Welcome back</h2><p className="login-intro">Sign in to access your IT support workspace.</p><form onSubmit={submit} className="login-form"><label>Work email<span className="login-input"><Mail size={16}/><input autoComplete="username" name="email" type="email" placeholder="you@company.com" required/></span></label><label>Password<span className="login-input"><LockKeyhole size={16}/><input autoComplete="current-password" name="password" type={showPassword ? "text" : "password"} placeholder="Enter your password" required/><button type="button" onClick={() => setShowPassword(!showPassword)}>{showPassword ? "Hide" : "Show"}</button></span></label><ErrorAlert message={error} onClose={() => setError("")}/><button className="login-submit" disabled={busy} aria-busy={busy}>{busy && <Spinner/>}{busy ? "Signing in…" : "Sign in to workspace"}{!busy && <ArrowRight size={17}/>}</button></form><div className="login-help"><span>Access managed by your IT administrator</span><a href="mailto:support@lumeo.local">Need help? <ArrowUpRight size={13}/></a></div></div><div className="login-legal">© 2026 LUMEO <span>·</span> Internal use only <span className="login-secure"><Shield size={12}/> Secure connection</span></div></div></main>;
 }
 
-function Overview({ user, tickets, openCount, resolvedCount, activeStaffCount, loading, onViewTickets, onCreate, onSelectTicket }: { user: User; tickets: TicketRecord[]; openCount: number; resolvedCount: number; activeStaffCount: number; loading: boolean; onViewTickets: () => void; onCreate: () => void; onSelectTicket: (ticket: TicketRecord) => void }) {
+function Overview({ user, tickets, openCount, resolvedCount, activeStaffCount, loading, onViewTickets, onCreate, onOpenKnowledgeBase, onSelectTicket }: { user: User; tickets: TicketRecord[]; openCount: number; resolvedCount: number; activeStaffCount: number; loading: boolean; onViewTickets: () => void; onCreate: () => void; onOpenKnowledgeBase: () => void; onSelectTicket: (ticket: TicketRecord) => void }) {
   const latest = tickets.slice(0, 5);
   return <div className="overview-grid"><div className="overview-main"><div className="welcome-card"><div className="welcome-text"><span className="welcome-chip"><span/>YOUR SUPPORT SPACE</span><h2>{user.role === "staff" ? "How can we help today?" : "IT support, at a glance."}</h2><p>{user.role === "staff" ? "Open a request with our team or follow up on something already in progress." : "See what is active, keep your team moving, and close the loop on requests."}</p><button className="welcome-action" onClick={onCreate}><FilePlus2 size={16}/>{user.role === "staff" ? "Submit a support request" : "Create a ticket"}<ArrowRight size={15}/></button></div><div className="welcome-orb"><div className="orb-ring ring-one"/><div className="orb-ring ring-two"/><div className="orb-center"><Headphones size={33}/></div><span className="orb-bubble bubble-top"><Check size={13}/></span><span className="orb-bubble bubble-side"><Ticket size={13}/></span></div><span className="welcome-mark">L.</span></div>
       <div className="metric-row"><MetricCard icon={<Ticket size={18}/>} label={user.role === "staff" ? "My open requests" : "Open requests"} value={openCount} tone="orange" caption="Need attention"/><MetricCard icon={<CircleCheck size={18}/>} label="Resolved" value={resolvedCount} tone="green" caption="Successfully closed"/><MetricCard icon={<Clock3 size={18}/>} label="Awaiting response" value={tickets.filter((ticket) => ["Pending", "Awaiting User"].includes(ticket.status)).length} tone="blue" caption="In the queue"/>{user.isSuperAdmin && <MetricCard icon={<Users size={18}/>} label="Active accounts" value={activeStaffCount} tone="violet" caption="Staff and IT admins"/>}</div>
+      <KnowledgeBasePreview onOpen={onOpenKnowledgeBase} />
       <section className="content-card recent-card"><div className="card-heading"><div><h3>{user.role === "staff" ? "Your recent requests" : "Latest tickets"}</h3><p>{user.role === "staff" ? "Updates from your IT support team." : "The newest requests in your workspace."}</p></div><button className="card-link" onClick={onViewTickets}>View all <ArrowRight size={14}/></button></div>{loading && !tickets.length ? <div className="table-loading">Loading requests…</div> : latest.length ? <TicketTable tickets={latest} admin={user.role !== "staff"} onSelect={onSelectTicket}/> : <div className="empty-dashboard"><span><Ticket size={20}/></span><b>Nothing in the queue yet</b><p>Your submitted requests will appear here.</p><button onClick={onCreate}>Create your first request <ArrowRight size={14}/></button></div>}</section>
       </div><aside className="overview-aside"><section className="side-stat-card"><div className="side-stat-heading"><span className="side-stat-symbol"><Activity size={17}/></span><span>WORKSPACE HEALTH</span><i/></div><h3>All systems operational</h3><p>Everything is running as expected. Your IT team is ready to help.</p><div className="health-line"><span/><b>Service desk</b><em>Operational</em></div><div className="health-line"><span/><b>Accounts &amp; access</b><em>Operational</em></div><div className="health-line"><span/><b>Network services</b><em>Operational</em></div></section><section className="content-card help-panel"><span className="help-panel-icon"><CircleHelp size={19}/></span><span className="mini-label">NEED HELP?</span><h3>We&apos;re here for you.</h3><p>Tell us what is happening and our support team will take it from there.</p><button className="outline-action" onClick={onCreate}>Open a support ticket <ArrowRight size={14}/></button></section><section className="response-note"><span><Clock3 size={16}/></span><div><b>Our usual response</b><p>We aim to respond to requests within one business day.</p></div></section></aside></div>;
+}
+function KnowledgeBasePreview({ onOpen }: { onOpen: () => void }) {
+  const [entries, setEntries] = useState<KnowledgeEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const response = await fetch("/api/knowledge-base", { cache: "no-store" });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || "Could not load knowledge base.");
+        if (!cancelled) setEntries((result.entries || []).slice(0, 3));
+      } catch {
+        if (!cancelled) setEntries([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    void load();
+    return () => { cancelled = true; };
+  }, []);
+
+  return <section className="content-card knowledge-preview"><div className="card-heading"><div><h3>Latest knowledge base</h3><p>Helpful guides and resources for your team.</p></div><button className="card-link" onClick={onOpen}>Open all <ArrowRight size={14}/></button></div>{loading ? <div className="table-loading">Loading knowledge base…</div> : entries.length ? <div className="knowledge-preview-list">{entries.map((entry) => <button key={entry.id} className="knowledge-preview-item" onClick={onOpen}><span className="knowledge-preview-icon"><EntryIcon type={entry.contentType} /></span><span><b>{entry.title}</b><small>{entry.contentType === "text" ? "Guide" : entry.contentType === "video" ? "Video" : entry.contentType === "youtube" ? "YouTube" : "PDF"}</small></span><ChevronRight size={15}/></button>)}</div> : <div className="empty-dashboard"><span><BookOpen size={20}/></span><b>No knowledge base entries yet</b><p>New guides will appear here.</p></div>}</section>;
+}
+function EntryIcon({ type }: { type: KnowledgeEntry["contentType"] }) {
+  const icons = { text: <BookOpen size={16}/>, pdf: <FileText size={16}/>, video: <Video size={16}/>, youtube: <PlayCircle size={16}/> };
+  return icons[type];
 }
 function MetricCard({ icon, label, value, tone, caption }: { icon: React.ReactNode; label: string; value: number; tone: string; caption: string }) {
   return <article className="metric-card"><div className={`metric-icon metric-${tone}`}>{icon}</div><div className="metric-label">{label}</div><div className="metric-value">{value}<span className={`metric-trend trend-${tone}`}><ArrowUpRight size={13}/></span></div><div className="metric-caption">{caption}</div></article>;
@@ -290,12 +346,12 @@ function Pagination({ page, pageCount, total, pageSize, onChange }: { page: numb
   return <div className="pagination"><span>Showing <b>{first}–{last}</b> of <b>{total}</b></span><div><button disabled={page <= 1} onClick={() => onChange(Math.max(1,page - 1))} aria-label="Previous page"><ChevronLeft size={15}/></button><span>Page <b>{page}</b> of {pageCount}</span><button disabled={page >= pageCount} onClick={() => onChange(Math.min(pageCount,page + 1))} aria-label="Next page"><ChevronRight size={15}/></button></div></div>;
 }
 
-function UserManagement({ users, loading, busyId, isSuperAdmin, onToggle, onRoleChange, onEdit }: { users: Account[]; loading: boolean; busyId: number | null; isSuperAdmin: boolean; onToggle: (user: Account) => void; onRoleChange: (user: Account, role: string) => void; onEdit: (user: Account) => void }) {
+function UserManagement({ users, loading, busyId, isSuperAdmin, onToggle, onRoleChange, onEdit, onDelete }: { users: Account[]; loading: boolean; busyId: number | null; isSuperAdmin: boolean; onToggle: (user: Account) => void; onRoleChange: (user: Account, role: string) => void; onEdit: (user: Account) => void; onDelete: (user: Account) => void }) {
   const [search, setSearch] = useState(""); const [filter, setFilter] = useState("All users");
   const [page, setPage] = useState(1); const pageSize = 10;
   const filtered = users.filter((person) => `${person.name} ${person.email} ${person.department || ""}`.toLowerCase().includes(search.toLowerCase()) && (filter === "All users" || (filter === "Active" ? Number(person.active) === 1 : Number(person.active) !== 1)));
   const pageCount = Math.max(1,Math.ceil(filtered.length/pageSize)); const visible = filtered.slice((page-1)*pageSize,page*pageSize);
-  return <div className="users-layout"><div className="user-note"><span className="user-note-icon"><ShieldCheck size={18}/></span><div><b>Super administrator controls</b><p>Only you can create or deactivate accounts. Deactivated users cannot sign in; their ticket and audit history remain intact.</p></div></div><section className="content-card users-card"><div className="users-toolbar"><div><h3>Workspace members <span>{users.length}</span></h3><p>Manage staff and IT administrator access.</p></div><div className="user-controls"><label className="queue-search"><Search size={15}/><input placeholder="Find a person" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }}/></label><label className="filter-select"><select value={filter} onChange={(event) => { setFilter(event.target.value); setPage(1); }}><option>All users</option><option>Active</option><option>Inactive</option></select><ChevronDown size={14}/></label></div></div><div className="ticket-table-scroll"><table className="dashboard-ticket-table user-table"><thead><tr><th>Person</th><th>Role</th><th>Department</th><th>Tickets</th><th>Account status</th><th>Access</th></tr></thead><tbody>{visible.map((person) => <tr key={person.id}><td><span className="person-cell"><span className={`mini-avatar ${Number(person.active) ? "" : "avatar-muted"}`}>{initials(person.name)}</span><span><b>{person.name}{Number(person.isSuperAdmin) ? <em className="owner-tag">OWNER</em> : null}</b><small>{person.email}</small></span></span></td><td>{Number(person.isSuperAdmin) ? <span className="role-chip role-owner">Super admin</span> : <select className="role-select" disabled={busyId !== null} aria-busy={busyId === person.id} value={person.role} onChange={(event) => onRoleChange(person, event.target.value)}><option value="staff">Staff</option><option value="admin">IT admin</option></select>}</td><td className="subtle-cell">{person.department || "—"}</td><td className="ticket-count-cell">{person.ticketCount ?? 0}</td><td><span className={`account-status ${Number(person.active) ? "account-active" : "account-inactive"}`}><i/>{Number(person.active) ? "Active" : "Deactivated"}</span></td><td>{Number(person.isSuperAdmin) ? <span className="protected-label"><Shield size={13}/> Protected</span> : <button className={`access-action ${Number(person.active) ? "access-disable" : "access-enable"}`} disabled={busyId !== null} aria-busy={busyId === person.id} onClick={() => onToggle(person)}>{busyId === person.id && <Spinner/>}{busyId === person.id ? "Saving…" : Number(person.active) ? "Deactivate" : "Reactivate"}</button>}</td></tr>)}</tbody></table>{!loading && !visible.length && <div className="table-empty">No matching accounts.</div>}{loading && <div className="table-loading">Loading accounts…</div>}</div><Pagination page={page} pageCount={pageCount} total={filtered.length} pageSize={pageSize} onChange={setPage}/><div className="table-footnote"><LockKeyhole size={13}/> Account changes are recorded in the activity log. User history is never erased.</div></section></div>;
+  return <div className="users-layout"><div className="user-note"><span className="user-note-icon"><ShieldCheck size={18}/></span><div><b>Super administrator controls</b><p>Super administrators can edit all account details, reset passwords, change access, and delete any account, including other super administrators.</p></div></div><section className="content-card users-card"><div className="users-toolbar"><div><h3>Workspace members <span>{users.length}</span></h3><p>Manage staff and IT administrator access.</p></div><div className="user-controls"><label className="queue-search"><Search size={15}/><input placeholder="Find a person" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }}/></label><label className="filter-select"><select value={filter} onChange={(event) => { setFilter(event.target.value); setPage(1); }}><option>All users</option><option>Active</option><option>Inactive</option></select><ChevronDown size={14}/></label></div></div><div className="ticket-table-scroll"><table className="dashboard-ticket-table user-table"><thead><tr><th>Person</th><th>Role</th><th>Department</th><th>Tickets</th><th>Account status</th><th>Access</th></tr></thead><tbody>{visible.map((person) => <tr key={person.id}><td><span className="person-cell"><span className={`mini-avatar ${Number(person.active) ? "" : "avatar-muted"}`}>{initials(person.name)}</span><span><b>{person.name}{Number(person.isSuperAdmin) ? <em className="owner-tag">OWNER</em> : null}</b><small>{person.email}</small></span></span></td><td>{Number(person.isSuperAdmin) ? <span className="role-chip role-owner">Super admin</span> : <select className="role-select" disabled={!isSuperAdmin || busyId !== null} aria-busy={busyId === person.id} value={person.role} onChange={(event) => onRoleChange(person, event.target.value)}><option value="staff">Staff</option><option value="admin">IT admin</option></select>}</td><td className="subtle-cell">{person.department || "—"}</td><td className="ticket-count-cell">{person.ticketCount ?? 0}</td><td><span className={`account-status ${Number(person.active) ? "account-active" : "account-inactive"}`}><i/>{Number(person.active) ? "Active" : "Deactivated"}</span></td><td><div className="account-actions">{(isSuperAdmin || (!Number(person.isSuperAdmin) && person.email.toLowerCase() !== "godwin@lumeomarketing.com")) && <button className="access-action" disabled={busyId !== null} onClick={() => onEdit(person)}>Edit</button>}{isSuperAdmin && <><button className={`access-action ${Number(person.active) ? "access-disable" : "access-enable"}`} disabled={busyId !== null} onClick={() => onToggle(person)}>{Number(person.active) ? "Deactivate" : "Reactivate"}</button><button className="access-action access-disable" disabled={busyId !== null} onClick={() => onDelete(person)}>Delete</button></>}</div></td></tr>)}</tbody></table>{!loading && !visible.length && <div className="table-empty">No matching accounts.</div>}{loading && <div className="table-loading">Loading accounts…</div>}</div><Pagination page={page} pageCount={pageCount} total={filtered.length} pageSize={pageSize} onChange={setPage}/><div className="table-footnote"><LockKeyhole size={13}/> Account changes are recorded in the activity log. Tickets, guides, and audit history are retained when an account is deleted.</div></section></div>;
 }
 
 function ActivityFeed({ events, loading }: { events: Event[]; loading: boolean }) {
@@ -341,14 +397,14 @@ function AddUserModal({ isSuperAdmin, onClose, onCreated }: { isSuperAdmin: bool
     catch { setError("The account service could not be reached."); }
     finally { setBusy(false); }
   }
-  return <Dialog onClose={onClose}><div className="dialog-heading"><div><span className="dialog-kicker">WORKSPACE ACCESS</span><h2>Add a teammate</h2><p>{isSuperAdmin ? "Create a staff, IT administrator, or super administrator account." : "Create a staff or IT administrator account."}</p></div><button className="dialog-x" onClick={onClose}><X size={18}/></button></div><form className="add-user-form" onSubmit={submit}><label>Full name<input name="name" placeholder="Jamie Rivera" required minLength={2}/></label><label>Work email<input name="email" placeholder="jamie@company.com" type="email" required/></label><label>Account role<select name="role">{isSuperAdmin && <option value="admin">IT administrator</option>}<option value="staff">Staff member</option>{isSuperAdmin && <option value="superadmin">Super administrator</option>}</select><small>{isSuperAdmin ? "Super administrators can manage protected account controls." : "Administrators can view and resolve every support ticket."}</small></label>{isSuperAdmin && <input type="hidden" name="isSuperAdmin" value="true"/>}<div className="request-grid"><label>Department<input name="department" placeholder="Operations"/></label><label>Job title<input name="jobTitle" placeholder="Team member"/></label></div><label>Location<input name="location" placeholder="Main office"/></label><label>Temporary password<span className="password-control"><input name="password" type={showPassword ? "text" : "password"} minLength={10} placeholder="At least 10 characters" required/><button type="button" onClick={() => setShowPassword(!showPassword)}>{showPassword ? "Hide" : "Show"}</button></span><small>Share this securely and ask the user to change it after sign-in.</small></label><ErrorAlert message={error} onClose={() => setError("")}/><div className="dialog-actions"><button type="button" className="button button-secondary" onClick={onClose}>Cancel</button><button className="button button-primary" disabled={busy} aria-busy={busy}>{busy && <Spinner/>}{busy ? "Creating…" : "Create account"}{!busy && <UserPlus size={15}/>}</button></div></form></Dialog>;
+  return <Dialog onClose={onClose}><div className="dialog-heading"><div><span className="dialog-kicker">WORKSPACE ACCESS</span><h2>Add a teammate</h2><p>{isSuperAdmin ? "Create a staff, IT administrator, or super administrator account." : "Create a staff or IT administrator account."}</p></div><button className="dialog-x" onClick={onClose}><X size={18}/></button></div><form className="add-user-form" onSubmit={submit}><label>Full name<input name="name" placeholder="Jamie Rivera" required minLength={2}/></label><label>Work email<input name="email" placeholder="jamie@company.com" type="email" required/></label><label>Account role<select name="role">{isSuperAdmin && <option value="admin">IT administrator</option>}<option value="staff">Staff member</option>{isSuperAdmin && <option value="superadmin">Super administrator</option>}</select><small>{isSuperAdmin ? "Super administrators can manage protected account controls." : "Administrators can view and resolve every support ticket."}</small></label><div className="request-grid"><label>Department<input name="department" placeholder="Operations"/></label><label>Job title<input name="jobTitle" placeholder="Team member"/></label></div><label>Location<input name="location" placeholder="Main office"/></label><label>Temporary password<span className="password-control"><input name="password" type={showPassword ? "text" : "password"} minLength={10} placeholder="At least 10 characters" required/><button type="button" onClick={() => setShowPassword(!showPassword)}>{showPassword ? "Hide" : "Show"}</button></span><small>Share this securely and ask the user to change it after sign-in.</small></label><ErrorAlert message={error} onClose={() => setError("")}/><div className="dialog-actions"><button type="button" className="button button-secondary" onClick={onClose}>Cancel</button><button className="button button-primary" disabled={busy} aria-busy={busy}>{busy && <Spinner/>}{busy ? "Creating…" : "Create account"}{!busy && <UserPlus size={15}/>}</button></div></form></Dialog>;
 }
 
-function EditUserModal({ user, onClose, onSaved }: { user: Account; onClose: () => void; onSaved: (user: Account) => void }) {
+function EditUserModal({ user, canManageAccess, onClose, onSaved }: { user: Account; canManageAccess: boolean; onClose: () => void; onSaved: (user: Account) => void }) {
   const [error, setError] = useState(""); const [busy, setBusy] = useState(false); const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState(user.name);
   const [email, setEmail] = useState(user.email);
-  const [role, setRole] = useState(String(user.role));
+  const [role, setRole] = useState(Number(user.isSuperAdmin) ? "superadmin" : String(user.role));
   const [department, setDepartment] = useState(user.department || "");
   const [jobTitle, setJobTitle] = useState(user.jobTitle || "");
   const [location, setLocation] = useState(user.location || "");
@@ -357,7 +413,8 @@ function EditUserModal({ user, onClose, onSaved }: { user: Account; onClose: () 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); if (busy) return; setBusy(true); setError("");
     try {
-      const payload: Record<string, string | boolean> = { name, email, role, department, jobTitle, location, active };
+      const payload: Record<string, string | boolean> = { name, email, department, jobTitle, location };
+      if (canManageAccess) { payload.role = role; payload.active = active; };
       if (password) payload.password = password;
       const response = await fetch(`/api/admin/users/${user.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const result = await response.json();
@@ -365,7 +422,7 @@ function EditUserModal({ user, onClose, onSaved }: { user: Account; onClose: () 
     } catch { setError("The account service could not be reached."); }
     finally { setBusy(false); }
   }
-  return <Dialog onClose={onClose}><div className="dialog-heading"><div><span className="dialog-kicker">ACCOUNT DETAILS</span><h2>Edit teammate</h2><p>Update the account and optionally assign a new password.</p></div><button className="dialog-x" onClick={onClose}><X size={18}/></button></div><form className="add-user-form" onSubmit={submit}><label>Full name<input value={name} onChange={(event) => setName(event.target.value)} placeholder="Jamie Rivera" required minLength={2}/></label><label>Work email<input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="jamie@company.com" type="email" required/></label><label>Account role<select value={role} onChange={(event) => setRole(event.target.value)}><option value="staff">Staff member</option><option value="admin">IT administrator</option></select><small>Administrators can view and resolve every support ticket.</small></label><div className="request-grid"><label>Department<input value={department} onChange={(event) => setDepartment(event.target.value)} placeholder="Operations"/></label><label>Job title<input value={jobTitle} onChange={(event) => setJobTitle(event.target.value)} placeholder="Team member"/></label></div><label>Location<input value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Main office"/></label><label>Account status<select value={active ? "active" : "inactive"} onChange={(event) => setActive(event.target.value === "active")}><option value="active">Active</option><option value="inactive">Inactive</option></select><small>Inactive accounts cannot sign in.</small></label><label>New password (optional)<span className="password-control"><input value={password} onChange={(event) => setPassword(event.target.value)} type={showPassword ? "text" : "password"} minLength={10} placeholder="At least 10 characters"/><button type="button" onClick={() => setShowPassword(!showPassword)}>{showPassword ? "Hide" : "Show"}</button></span><small>Leave blank to keep the current password.</small></label><ErrorAlert message={error} onClose={() => setError("")}/><div className="dialog-actions"><button type="button" className="button button-secondary" onClick={onClose}>Cancel</button><button className="button button-primary" disabled={busy} aria-busy={busy}>{busy && <Spinner/>}{busy ? "Saving…" : "Save changes"}{!busy && <UserPlus size={15}/>}</button></div></form></Dialog>;
+  return <Dialog onClose={onClose}><div className="dialog-heading"><div><span className="dialog-kicker">ACCOUNT DETAILS</span><h2>Edit teammate</h2><p>Update the account and optionally assign a new password.</p></div><button className="dialog-x" onClick={onClose}><X size={18}/></button></div><form className="add-user-form" onSubmit={submit}><label>Full name<input value={name} onChange={(event) => setName(event.target.value)} placeholder="Jamie Rivera" required minLength={2}/></label><label>Work email<input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="jamie@company.com" type="email" required/></label><label>Account role<select disabled={!canManageAccess} value={role} onChange={(event) => setRole(event.target.value)}><option value="staff">Staff member</option><option value="admin">IT administrator</option>{canManageAccess && <option value="superadmin">Super administrator</option>}</select><small>Administrators can view and resolve every support ticket.</small></label><div className="request-grid"><label>Department<input value={department} onChange={(event) => setDepartment(event.target.value)} placeholder="Operations"/></label><label>Job title<input value={jobTitle} onChange={(event) => setJobTitle(event.target.value)} placeholder="Team member"/></label></div><label>Location<input value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Main office"/></label><label>Account status<select disabled={!canManageAccess} value={active ? "active" : "inactive"} onChange={(event) => setActive(event.target.value === "active")}><option value="active">Active</option><option value="inactive">Inactive</option></select><small>Inactive accounts cannot sign in.</small></label><label>New password (optional)<span className="password-control"><input value={password} onChange={(event) => setPassword(event.target.value)} type={showPassword ? "text" : "password"} minLength={10} placeholder="At least 10 characters"/><button type="button" onClick={() => setShowPassword(!showPassword)}>{showPassword ? "Hide" : "Show"}</button></span><small>Leave blank to keep the current password.</small></label><ErrorAlert message={error} onClose={() => setError("")}/><div className="dialog-actions"><button type="button" className="button button-secondary" onClick={onClose}>Cancel</button><button className="button button-primary" disabled={busy} aria-busy={busy}>{busy && <Spinner/>}{busy ? "Saving…" : "Save changes"}{!busy && <UserPlus size={15}/>}</button></div></form></Dialog>;
 }
 
 function Dialog({ children, onClose, wide = false }: { children: React.ReactNode; onClose: () => void; wide?: boolean }) {

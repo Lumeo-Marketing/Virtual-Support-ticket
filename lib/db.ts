@@ -19,7 +19,7 @@ export interface UserRecord {
 export interface TicketRecord {
   id: number;
   ticketCode: string;
-  userId: number;
+  userId: number | null;
   fullName: string;
   workEmail: string;
   department: string;
@@ -131,12 +131,27 @@ async function initializeDatabase() {
         details TEXT NOT NULL DEFAULT '',
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
+      CREATE TABLE IF NOT EXISTS knowledge_base (
+        id BIGSERIAL PRIMARY KEY,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        content_type TEXT NOT NULL CHECK (content_type IN ('text','pdf','video','youtube')),
+        steps TEXT NOT NULL DEFAULT '',
+        youtube_url TEXT,
+        file_name TEXT,
+        file_data BYTEA,
+        file_size BIGINT NOT NULL DEFAULT 0,
+        created_by BIGINT NOT NULL REFERENCES users(id),
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
       CREATE INDEX IF NOT EXISTS tickets_user_id_idx ON tickets(user_id);
       CREATE INDEX IF NOT EXISTS tickets_status_idx ON tickets(status);
       CREATE INDEX IF NOT EXISTS notifications_user_id_idx ON notifications(user_id,read_at);
       CREATE INDEX IF NOT EXISTS messages_participants_idx ON messages(sender_id,recipient_id,created_at DESC);
       CREATE INDEX IF NOT EXISTS messages_recipient_idx ON messages(recipient_id,read_at);
       CREATE INDEX IF NOT EXISTS activity_events_created_idx ON activity_events(id DESC);
+      CREATE INDEX IF NOT EXISTS knowledge_base_created_idx ON knowledge_base(created_at DESC);
     `);
     await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT TRUE");
     await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_super_admin BOOLEAN NOT NULL DEFAULT FALSE");
@@ -151,13 +166,17 @@ async function initializeDatabase() {
     )`);
     await client.query("CREATE INDEX IF NOT EXISTS messages_participants_idx ON messages(sender_id,recipient_id,created_at DESC)");
     await client.query("CREATE INDEX IF NOT EXISTS messages_recipient_idx ON messages(recipient_id,read_at)");
-    await seedUser(client, { name: "Moses Effiom", email: process.env.ADMIN_EMAIL || "admin@lumeo.com", password: process.env.ADMIN_PASSWORD || "Admin123!", role: "admin", department: "IT", jobTitle: "IT Administrator" });
-    await seedUser(client, { name: "Alex Morgan", email: process.env.STAFF_EMAIL || "staff@lumeo.com", password: process.env.STAFF_PASSWORD || "Staff123!", role: "staff", department: "Operations", jobTitle: "Operations Associate" });
-    const owner = await seedUser(client, { name: "LUMEO Owner", email: process.env.SUPER_ADMIN_EMAIL || "owner@lumeo.com", password: process.env.SUPER_ADMIN_PASSWORD || "Owner123!", role: "admin", department: "IT", jobTitle: "Super Administrator" });
-    await client.query(`UPDATE users SET name=$1
-      WHERE LOWER(email)=$2 AND name=$3`, ["Godwin", "godwin@lumeomarketing.com", "LUMEO Owner"]);
-    await client.query("UPDATE users SET is_super_admin=FALSE WHERE id<>$1 AND is_super_admin=TRUE", [owner.id]);
-    await client.query("UPDATE users SET is_super_admin=TRUE,password_hash=$2,active=TRUE WHERE id=$1", [owner.id, bcrypt.hashSync(process.env.SUPER_ADMIN_PASSWORD || "Owner123!", 12)]);
+    // Seed only a new database so account edits and deletions survive restarts.
+    const existingUsers = await client.query("SELECT (EXISTS (SELECT 1 FROM users) OR EXISTS (SELECT 1 FROM activity_events)) AS populated");
+    if (!existingUsers.rows[0].populated) {
+      await seedUser(client, { name: "Moses Effiom", email: process.env.ADMIN_EMAIL || "admin@lumeo.com", password: process.env.ADMIN_PASSWORD || "Admin123!", role: "admin", department: "IT", jobTitle: "IT Administrator" });
+      await seedUser(client, { name: "Alex Morgan", email: process.env.STAFF_EMAIL || "staff@lumeo.com", password: process.env.STAFF_PASSWORD || "Staff123!", role: "staff", department: "Operations", jobTitle: "Operations Associate" });
+      const owner = await seedUser(client, { name: "LUMEO Owner", email: process.env.SUPER_ADMIN_EMAIL || "owner@lumeo.com", password: process.env.SUPER_ADMIN_PASSWORD || "Owner123!", role: "admin", department: "IT", jobTitle: "Super Administrator" });
+      await client.query("UPDATE users SET is_super_admin=TRUE WHERE id=$1", [owner.id]);
+    }
+    // Keep historical tickets and guides when their author account is deleted.
+    await client.query("ALTER TABLE tickets ALTER COLUMN user_id DROP NOT NULL");
+    await client.query("ALTER TABLE knowledge_base ALTER COLUMN created_by DROP NOT NULL");
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK");
@@ -185,7 +204,7 @@ export async function getDb(): Promise<Pool> {
 }
 
 export function asUser(row: Record<string, unknown>): UserRecord {
-  const isSuperAdmin = Boolean(row.is_super_admin ?? row.isSuperAdmin);
+  const isSuperAdmin = Boolean(row.is_super_admin ?? row.isSuperAdmin) || String(row.email).trim().toLowerCase() === "godwin@lumeomarketing.com";
   return { id: Number(row.id), name: String(row.name), email: String(row.email), role: isSuperAdmin ? "superadmin" : row.role as Role, isSuperAdmin, active: Boolean(row.active ?? true), department: row.department ? String(row.department) : null, jobTitle: (row.job_title ?? row.jobTitle) ? String(row.job_title ?? row.jobTitle) : null, location: row.location ? String(row.location) : null };
 }
 
@@ -197,7 +216,7 @@ export async function logActivity(actor: UserRecord, action: string, entityType:
 
 export function asTicket(row: QueryResultRow | Record<string, unknown>): TicketRecord {
   return {
-    id: Number(row.id), ticketCode: String(row.ticket_code ?? row.ticketCode ?? ""), userId: Number(row.user_id ?? row.userId), fullName: String(row.full_name ?? row.fullName), workEmail: String(row.work_email ?? row.workEmail),
+    id: Number(row.id), ticketCode: String(row.ticket_code ?? row.ticketCode ?? ""), userId: (row.user_id ?? row.userId) == null ? null : Number(row.user_id ?? row.userId), fullName: String(row.full_name ?? row.fullName), workEmail: String(row.work_email ?? row.workEmail),
     department: String(row.department), jobTitle: String(row.job_title ?? row.jobTitle), location: String(row.location), requestType: String(row.request_type ?? row.requestType), requestSubtype: String(row.request_subtype ?? row.requestSubtype),
     category: String(row.category), priority: String(row.priority), subject: String(row.subject), description: String(row.description), attachmentPath: (row.attachment_path ?? row.attachmentPath) ? String(row.attachment_path ?? row.attachmentPath) : null,
     attachmentName: (row.attachment_name ?? row.attachmentName) ? String(row.attachment_name ?? row.attachmentName) : null, resolution: String(row.resolution || ""), status: row.status as TicketStatus,
