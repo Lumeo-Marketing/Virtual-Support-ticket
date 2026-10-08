@@ -85,7 +85,7 @@ export async function notifyTicketCreated(input: { userId: number; ticket: Ticke
   await storeNotice({ userId: input.userId, ticketId: ticket.id, ticketCode: ticket.ticketCode, status: "Open", message: confirmation });
 
   const db = await getDb();
-  const primaryAdminEmails = (process.env.SUPPORT_ADMIN_EMAILS || "moses@lumeomarketing.com").split(/[;,]/).map((email) => email.trim().toLowerCase()).filter(Boolean);
+  const primaryAdminEmails = (process.env.SUPPORT_ADMIN_EMAILS || "moses@twinklehealthcare.com").split(/[;,]/).map((email) => email.trim().toLowerCase()).filter(Boolean);
   const ccAdminEmails = (process.env.SUPPORT_ADMIN_CC || "godwin@lumeomarketing.com").split(/[;,]/).map((email) => email.trim().toLowerCase()).filter(Boolean);
   const recipients = [...new Set(primaryAdminEmails)];
   const cc = [...new Set(ccAdminEmails.filter((email) => !recipients.includes(email)))];
