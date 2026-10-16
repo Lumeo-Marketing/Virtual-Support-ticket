@@ -27,6 +27,8 @@ The schema and indexes are created automatically on the first database request a
 
 Use the same deployed HTTPS portal URL for the GHL custom menu link and direct access. For an embedded page, production sessions use `Secure; HttpOnly; SameSite=None; Partitioned` cookies. Local HTTP development keeps `SameSite=Lax` cookies and is intended for direct access.
 
+Set `APP_URL` in the deployment environment to that exact public HTTPS portal URL (for example, `https://support.example.com`), then rebuild and restart the app. The API request guard accepts this configured origin even when the hosting proxy passes an internal server URL to Next.js. Use the portal URL here, rather than the GHL dashboard URL. Requests from unrelated origins remain blocked.
+
 After deploying this session update, sign in again. Embedded and direct sessions are independent because the browser partitions cookies by the top-level site; signing in or out in one context does not sign in or out in the other. Both views still use the deployment's same PostgreSQL database and account permissions. A custom menu link does not provide GHL single sign-on.
 
 Login now checks that the browser sends the session back before opening the dashboard. If the browser or embedding settings still block sessions, the sign-in screen offers a link to open the workspace in a new tab. You can also set the GHL custom menu link to **New Browser Tab**. If the two views still show different data, check that the menu points to the exact same deployment and that you are using the same account.

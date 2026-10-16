@@ -10,7 +10,7 @@ function load(file, mocks, env = process.env) {
     compilerOptions: { module: ts.ModuleKind.CommonJS, esModuleInterop: true },
   }).outputText, {
     exports, require: (name) => mocks[name] || require(name),
-    process: { env }, TextEncoder,
+    process: { env }, TextEncoder, URL,
   });
   return exports;
 }
@@ -89,5 +89,23 @@ function load(file, mocks, env = process.env) {
     assert.equal(proxy(request(method)).status, 200);
   }
   assert.equal(proxy(request('GET', { 'sec-fetch-site': 'cross-site' })).status, 200);
+  const { proxy: deployedProxy } = load('proxy.ts', {}, { APP_URL: 'https://support.example.com/workspace/' });
+  for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
+    function deployedRequest(headers) {
+      return new NextRequest('http://localhost:3000/api/auth/login', { method, headers });
+    }
+    assert.equal(deployedProxy(deployedRequest({ origin: 'https://support.example.com', 'sec-fetch-site': 'same-origin' })).status, 200);
+    assert.equal(proxy(deployedRequest({ origin: 'http://support.example.com', host: 'support.example.com', 'sec-fetch-site': 'same-origin' })).status, 200);
+    for (const origin of ['https://attacker.example', 'https://support.example.com.attacker.example', 'https://app.gohighlevel.com', 'null', 'invalid']) {
+      assert.equal(deployedProxy(deployedRequest({ origin, 'sec-fetch-site': 'same-origin', 'x-forwarded-host': 'attacker.example' })).status, 403);
+    }
+    assert.equal(deployedProxy(deployedRequest({ origin: 'https://support.example.com', 'sec-fetch-site': 'cross-site' })).status, 403);
+    assert.equal(deployedProxy(deployedRequest({ 'sec-fetch-site': 'cross-site' })).status, 403);
+  }
+  for (const APP_URL of ['invalid', 'file:///tmp/portal', '']) {
+    const { proxy: invalidConfigProxy } = load('proxy.ts', {}, { APP_URL });
+    assert.equal(invalidConfigProxy(request('POST', { origin: 'null' })).status, 403);
+    assert.equal(invalidConfigProxy(request('POST', { origin: 'https://support.example.com' })).status, 200);
+  }
   console.log('Embedded/standalone cookie, signed-session, logout, and cross-origin protection checks passed.');
 })().catch((error) => { console.error(error); process.exitCode = 1; });
