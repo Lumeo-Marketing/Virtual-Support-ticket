@@ -23,6 +23,14 @@ Install dependencies and start the application:
 
 The schema and indexes are created automatically on the first database request and upgraded safely on subsequent starts. Keep PostgreSQL running while the app is running. You can inspect and back up all structured records using your normal PostgreSQL tools.
 
+## GoHighLevel custom menu links
+
+Use the same deployed HTTPS portal URL for the GHL custom menu link and direct access. For an embedded page, production sessions use `Secure; HttpOnly; SameSite=None; Partitioned` cookies. Local HTTP development keeps `SameSite=Lax` cookies and is intended for direct access.
+
+After deploying this session update, sign in again. Embedded and direct sessions are independent because the browser partitions cookies by the top-level site; signing in or out in one context does not sign in or out in the other. Both views still use the deployment's same PostgreSQL database and account permissions. A custom menu link does not provide GHL single sign-on.
+
+Login now checks that the browser sends the session back before opening the dashboard. If the browser or embedding settings still block sessions, the sign-in screen offers a link to open the workspace in a new tab. You can also set the GHL custom menu link to **New Browser Tab**. If the two views still show different data, check that the menu points to the exact same deployment and that you are using the same account.
+
 ## Existing local SQLite data
 
 The app no longer reads SQLite at runtime. To copy existing `support.db` users, tickets, notifications, and audit events into the configured PostgreSQL database, set `DATABASE_URL` in `.env.local` and run:
