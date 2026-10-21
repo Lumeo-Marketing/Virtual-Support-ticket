@@ -50,14 +50,14 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     if ((nextLocation ?? null) !== (target.location ?? null)) { updates.push("location=$" + (values.length + 1)); values.push(nextLocation); changes.push(`location: ${target.location || "—"} → ${nextLocation || "—"}`); }
     if (nextActive !== target.active) { updates.push("active=$" + (values.length + 1)); values.push(nextActive); changes.push(`status: ${target.active ? "active" : "inactive"} → ${nextActive ? "active" : "inactive"}`); }
     if (rawPassword) {
-      updates.push("password_hash=$" + (values.length + 1)); values.push(bcrypt.hashSync(rawPassword, 12));
+      updates.push("password_hash=$" + (values.length + 1)); values.push(await bcrypt.hash(rawPassword, 12));
       changes.push("password: changed");
     }
 
     if (!updates.length) return NextResponse.json({ error: "No account changes were provided." }, { status: 400 });
     await db.query(`UPDATE users SET ${updates.join(", ")} WHERE id=$${values.length + 1}`, [...values, id]);
 
-    for (const change of changes) await logActivity(actor, change.includes("password") ? "changed account password" : change.startsWith("status") ? "changed account status" : change.startsWith("role") ? "changed account role" : "updated account details", "user", id, `${target.email}: ${change}`);
+    await Promise.all(changes.map((change) => logActivity(actor, change.includes("password") ? "changed account password" : change.startsWith("status") ? "changed account status" : change.startsWith("role") ? "changed account role" : "updated account details", "user", id, `${target.email}: ${change}`)));
 
     const updated = await db.query(`SELECT id,name,email,role,department,job_title AS "jobTitle",location,active,is_super_admin AS "isSuperAdmin",created_at AS "createdAt" FROM users WHERE id=$1`, [id]);
     return NextResponse.json({ user: { ...updated.rows[0], id: Number(updated.rows[0].id) } });

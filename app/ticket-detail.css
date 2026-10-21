@@ -1,0 +1,74 @@
+.dialog-card.ticket-dialog{width:min(820px,100%);min-width:0;max-width:100%;padding:28px;max-height:92dvh}
+.ticket-dialog .dialog-heading{padding-bottom:20px;gap:24px}
+.ticket-dialog .dialog-heading>div{min-width:0}
+.ticket-dialog .dialog-heading h2{overflow-wrap:anywhere;font-size:25px;line-height:1.25;margin:8px 0;color:#243448}
+.ticket-dialog .dialog-kicker{font-size:10px;font-weight:750;letter-spacing:.16em}
+.ticket-dialog .dialog-heading p{font-size:12px}
+.ticket-dialog .dialog-x{width:32px;height:32px;border-radius:50%}
+.ticket-progress{--progress-color:#da812e;--progress-soft:#fff2e2;padding:20px 20px 0;margin:20px 0 4px;background:linear-gradient(120deg,#fffaf4,#fcfcfd);border:1px solid #eee5d9;border-radius:12px}
+.ticket-progress.progress-waiting{--progress-color:#af8626;--progress-soft:#fff7d9}
+.ticket-progress.progress-escalated{--progress-color:#8063b3;--progress-soft:#f1eafb}
+.ticket-progress.progress-complete{--progress-color:#328563;--progress-soft:#e9f6ef}
+.ticket-progress-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.ticket-section-eyebrow{font-size:9px;letter-spacing:.12em;color:#9b8064;font-weight:750}
+.ticket-progress-heading h3{font-size:15px;margin:5px 0 0;color:#344355;letter-spacing:-.3px}
+.ticket-progress-heading .status-label{font-size:10px;padding:6px 10px;border:1px solid #00000006;border-radius:20px}
+.ticket-progress-steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));list-style:none;margin:24px 0 20px;padding:0}
+.ticket-progress-steps li{position:relative;min-width:0;display:flex;flex-direction:column;gap:11px}
+.ticket-progress-steps li:not(:last-child)::after{content:"";position:absolute;top:17px;left:42px;right:8px;height:2px;background:#e6e9ed}
+.ticket-progress-steps .step-done::after{background:var(--progress-color)!important;opacity:.5}
+.progress-node{height:36px;width:36px;border-radius:50%;display:grid;place-items:center;position:relative;background:#f1f3f6;color:#acb4bf;border:1px solid #e3e7ec}
+.step-done .progress-node{background:var(--progress-color);color:white;border-color:var(--progress-color)}
+.step-current .progress-node{background:var(--progress-soft);color:var(--progress-color);border:2px solid var(--progress-color);box-shadow:0 0 0 4px white,0 0 0 5px var(--progress-soft)}
+.ticket-progress-steps b{display:block;font-size:12px;color:#9aa3af;font-weight:650}
+.ticket-progress-steps small{display:block;margin-top:5px;font-size:10px;color:#a2aab5;line-height:1.5;max-width:135px;padding-right:8px}
+.step-done b{color:#526574}.step-current b{color:var(--progress-color)}.step-current small{color:#778393}
+.ticket-progress-summary{display:flex;align-items:center;gap:8px;border-top:1px solid #eae5de;padding:12px 0;flex-wrap:wrap}
+.progress-summary-dot{height:6px;width:6px;flex-shrink:0;border-radius:50%;background:var(--progress-color)}
+.ticket-progress-summary p{font-size:11px;color:#6f7b89;line-height:1.6;flex:1;margin:0;min-width:170px}
+.progress-updated{font-size:9px;color:#9bA4ae;white-space:nowrap}
+.ticket-dialog .detail-info-grid{gap:16px;grid-template-columns:1.35fr 1fr .8fr 1fr;padding:20px 0;border:0}
+.ticket-dialog .detail-info-grid>div{min-width:0;gap:6px}
+.ticket-dialog .detail-info-grid small{font-size:9px;text-transform:uppercase;letter-spacing:.08em}
+.ticket-dialog .detail-info-grid b{font-size:12px;line-height:1.5}
+.ticket-dialog .detail-info-grid span{font-size:11px;overflow-wrap:anywhere;line-height:1.5}
+.ticket-dialog .ticket-assignee{display:flex;align-items:center;gap:10px;margin:0 0 18px;padding:10px 12px;border:1px solid #edf0f3;border-radius:9px;background:#fafbfc;font-size:10px;color:#8b97a5}
+.assignee-symbol{height:32px;width:32px;border-radius:8px;background:#edf1f6;color:#78899c;display:grid;place-items:center}
+.ticket-assignee b{display:block;font-size:12px;margin-top:3px;color:#45566a}
+.assignee-support-label{margin-left:auto;font-size:8px;letter-spacing:.12em;color:#a5adba}
+.ticket-dialog .ticket-description{padding:0 0 18px}.ticket-dialog .ticket-description>small{font-size:10px}
+.ticket-dialog .ticket-description p{font-size:13px;color:#5e6d7e;line-height:1.7;margin:8px 0 0;overflow-wrap:anywhere}
+.ticket-dialog .existing-resolution{padding:14px 16px;border-left:3px solid #75ac91;margin:16px 0;background:#f4f9f6}
+.ticket-dialog .resolve-form{padding-top:20px}
+.ticket-dialog .dialog-section-title{align-items:flex-start;margin-bottom:16px;gap:10px}
+.ticket-dialog .dialog-section-title>b{font-size:14px;color:#344355}
+.ticket-dialog .dialog-section-title>span{font-size:11px;line-height:1.5}
+.ticket-dialog .resolve-fields{grid-template-columns:minmax(0,1fr) minmax(0,1.65fr);gap:18px 16px;align-items:start}
+.ticket-dialog .resolve-fields label{font-size:12px;gap:8px;min-width:0;align-content:start}
+.ticket-dialog .resolve-fields select{height:42px;font-size:12px;border-radius:8px;padding:10px 12px}
+.ticket-dialog .resolve-fields label>small{font-size:10px;color:#929eac;font-weight:400;line-height:1.5}
+.ticket-dialog .resolve-fields .resolution-input{grid-column:1/-1;position:relative;gap:6px}
+.resolution-hint{font-size:11px;color:#929eac;font-weight:400;line-height:1.5}
+.ticket-dialog .resolve-fields textarea{min-height:118px;width:100%;font-size:13px;padding:13px 14px;border-radius:9px;line-height:1.7;margin-top:4px}
+.ticket-dialog .dialog-actions{margin-top:20px;padding-top:16px;gap:10px}
+.ticket-dialog .dialog-actions .button{height:40px;font-size:12px;padding:0 16px}
+@media(max-width:600px){
+ .dialog-card.ticket-dialog{padding:22px 18px;max-height:94dvh}
+ .ticket-dialog .dialog-heading>div{min-width:0}
+.ticket-dialog .dialog-heading h2{overflow-wrap:anywhere;font-size:21px}
+ .ticket-dialog .dialog-heading p{font-size:11px}
+ .ticket-progress{padding:16px 16px 0;margin-top:16px}
+ .ticket-progress-heading h3{font-size:14px}
+ .ticket-progress-steps{grid-template-columns:1fr;gap:0;margin:20px 0 8px}
+ .ticket-progress-steps li{flex-direction:row;gap:14px;min-height:68px}
+ .ticket-progress-steps li:last-child{min-height:56px}
+ .ticket-progress-steps li:not(:last-child)::after{left:17px;top:40px;bottom:4px;right:auto;width:2px;height:auto}
+ .ticket-progress-steps li>div{padding-top:2px}
+ .ticket-progress-steps small{max-width:none;padding-right:0;margin-top:3px}
+ .progress-updated{padding-left:14px;width:100%}
+ .ticket-dialog .detail-info-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+ .ticket-dialog .resolve-fields{grid-template-columns:1fr}
+ .ticket-dialog .dialog-section-title{flex-direction:column;gap:5px}
+ .ticket-dialog .dialog-actions .button{padding:0 12px;font-size:11px}
+ .assignee-support-label{display:none}
+}

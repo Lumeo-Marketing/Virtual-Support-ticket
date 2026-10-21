@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     const now = new Date().toISOString();
     const db = await getDb();
     const result = await db.query(`INSERT INTO users (name,email,password_hash,role,department,job_title,location,is_super_admin,created_at)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`, [name, email, bcrypt.hashSync(password, 12), role, department || null, jobTitle || null, location || null, isSuperAdmin, now]);
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`, [name, email, await bcrypt.hash(password, 12), role, department || null, jobTitle || null, location || null, isSuperAdmin, now]);
     const id = Number(result.rows[0].id);
     await logActivity(actor, "created account", "user", id, `${isSuperAdmin ? "super-admin" : role} account created for ${email}`);
     return NextResponse.json({ user: { id, name, email, role, department, jobTitle, location, active: true, isSuperAdmin, createdAt: now, ticketCount: 0 } }, { status: 201 });

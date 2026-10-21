@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "./alert-styles.css";
+@import "./ticket-detail.css";
 @import "./dashboard-typography.css";
 @import "./report-styles.css";
 @import "./report-styles.css";
@@ -39,3 +40,18 @@
 @media(max-width:760px){.messaging-workspace{display:flex;height:calc(100dvh - 210px);min-height:500px}.conversation-sidebar{width:100%;border-right:0}.conversation-panel{display:none;width:100%}.has-conversation .conversation-sidebar{display:none}.has-conversation .conversation-panel{display:flex}.conversation-back{display:grid;place-items:center;padding:5px}.conversation-header{padding:16px}.conversation-history{padding:16px}.conversation-compose{padding:14px}.message-bubble{max-width:92%}.messages-trigger{padding:8px;gap:5px;font-size:12px}.messages-trigger>span{display:none}.messages-trigger>b{min-width:20px;height:20px;font-size:11px}}
 
 .account-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.account-actions .access-action:disabled{opacity:.5;cursor:wait}
+
+.message-delivery{display:inline-flex;align-items:center;gap:4px;margin-left:8px;color:#687586}.message-delivery.message-read{color:#2877b8}.message-bubble small{display:flex;align-items:center;flex-wrap:wrap;gap:4px}.ticket-assignee{font-size:12px;color:#687586}
+
+.profile-menu{position:relative}
+.profile-trigger{border:1px solid transparent;background:transparent;border-radius:8px;padding:6px;text-align:left;transition:background .15s,border-color .15s}
+.profile-trigger:hover,.profile-trigger-open{background:#fff8ef;border-color:#f2e4d3}
+.profile-trigger>svg{transition:transform .15s}.profile-trigger-open>svg{transform:rotate(180deg)}
+.profile-dropdown{position:absolute;right:0;top:calc(100% + 10px);width:220px;max-width:calc(100vw - 34px);padding:6px;background:#fff;border:1px solid #e6eaf0;border-radius:11px;box-shadow:0 12px 36px #1c293b24;z-index:12}
+.profile-dropdown-account{display:grid;gap:5px;padding:11px 10px 13px;margin-bottom:5px;border-bottom:1px solid #edf0f3;overflow-wrap:anywhere}
+.profile-dropdown-account>b{color:#344355;font-size:12px}.profile-dropdown-account>span{color:#8793a1;font-size:11px}
+.profile-dropdown>button{display:flex;align-items:center;gap:10px;width:100%;border:0;border-radius:6px;background:transparent;color:#b95140;padding:11px 10px;text-align:left;font-size:12px;font-weight:650}
+.profile-dropdown>button:hover{background:#fff2ee}
+.sidebar-user{flex-wrap:wrap}.sidebar-user>button.sidebar-logout{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;margin-top:6px;padding:9px 12px;border:1px solid #ffffff1c;border-radius:7px;background:#ffffff05;color:#c3cdd8;font-size:11px;font-weight:600}
+.sidebar-user>button.sidebar-logout:hover{color:#fff;background:#ffffff10;border-color:#ffffff30}
+@media(max-width:720px){.profile-trigger{padding:4px}.profile-trigger>svg{display:block;width:12px}.profile-trigger{gap:5px}}

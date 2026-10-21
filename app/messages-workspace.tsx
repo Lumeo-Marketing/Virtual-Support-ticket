@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { DismissibleErrorAlert, ErrorAlert, Spinner, useAlerts } from "./alerts";
-import { Mail, Search, Send, ArrowLeft, Plus } from "lucide-react";
+import { DismissibleErrorAlert, ErrorAlert, Spinner } from "./alerts";
+import { Mail, Search, Send, ArrowLeft, Plus, CheckCheck } from "lucide-react";
 
 export type Message = { id: number; senderId: number; recipientId: number; content: string; createdAt: string; senderName: string; senderEmail: string; senderRole: string; senderIsSuperAdmin?: boolean; senderActive?: boolean; recipientName: string; recipientEmail: string; recipientRole?: string; recipientIsSuperAdmin?: boolean; recipientActive?: boolean; readAt: string | null };
 export type Recipient = { id: number; name: string; email: string; role: string; active: boolean; isSuperAdmin: boolean };
@@ -11,8 +11,23 @@ const roleLabel = (person: Recipient) => person.isSuperAdmin || person.role === 
 const initials = (name: string) => name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
 const stamp = (date: string) => new Date(date).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
+// A poll started before a send/read completed must not remove that local update.
+export function mergeMessages(current: Message[], incoming: Message[]) {
+  const existing = new Map(current.map((message) => [message.id, message]));
+  const newestIncomingId = incoming.reduce((latest, message) => Math.max(latest, message.id), 0);
+  return [
+    ...current.filter((message) => message.id > newestIncomingId),
+    ...incoming.map((message) => ({ ...message, readAt: message.readAt || existing.get(message.id)?.readAt || null })),
+  ].sort((a, b) => b.id - a.id);
+}
+
 export function MessagesWorkspace({ user, messages, recipients, loadError, onSent, onRead }: Props) {
-  const { show } = useAlerts();
+  const [sentNotice, setSentNotice] = useState<{ recipientId: number; messageId: number } | null>(null);
+  useEffect(() => {
+    if (!sentNotice) return;
+    const timer = window.setTimeout(() => setSentNotice(null), 3000);
+    return () => window.clearTimeout(timer);
+  }, [sentNotice]);
   const [selectedId, setSelectedId] = useState(0);
   const [search, setSearch] = useState("");
   const [unreadOnly, setUnreadOnly] = useState(false);
@@ -69,8 +84,8 @@ export function MessagesWorkspace({ user, messages, recipients, loadError, onSen
       const response = await fetch("/api/messages", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ recipientId: recipient.id, content: text }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Could not send your message.");
-      onSent({ ...result.message, content: text, senderName: user.name, senderEmail: user.email, senderRole: user.role, senderIsSuperAdmin: user.isSuperAdmin, recipientName: recipient.name, recipientEmail: recipient.email, recipientRole: recipient.role, recipientIsSuperAdmin: recipient.isSuperAdmin, readAt: null });
-      show("Your message was sent.");
+      onSent({ ...result.message, content: text, senderName: user.name, senderEmail: user.email, senderRole: user.role, senderIsSuperAdmin: user.isSuperAdmin, senderActive: true, recipientActive: recipient.active, recipientName: recipient.name, recipientEmail: recipient.email, recipientRole: recipient.role, recipientIsSuperAdmin: recipient.isSuperAdmin, readAt: null });
+      setSentNotice({ recipientId: recipient.id, messageId: result.message.id });
       setDrafts((values) => ({ ...values, [recipient.id]: "" }));
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not send your message. Try again."); }
     finally { setBusy(false); }
@@ -87,8 +102,8 @@ export function MessagesWorkspace({ user, messages, recipients, loadError, onSen
       </aside>
       <div className="conversation-panel">{selected ? <>
         <header className="conversation-header"><button className="conversation-back" aria-label="Back to conversations" onClick={() => select(0)}><ArrowLeft size={20}/></button><span className="conversation-avatar">{initials(selected.name)}</span><div><h2>{selected.name}</h2><p>{roleLabel(selected)} · {selected.email}</p></div></header>
-        <div className="conversation-history" role="log" aria-label={`Conversation with ${selected.name}`} aria-live="polite">{thread.length ? thread.map((message, index) => <div key={message.id}>{(index === 0 || new Date(thread[index - 1].createdAt).toDateString() !== new Date(message.createdAt).toDateString()) && <div className="conversation-date">{new Date(message.createdAt).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}</div>}<article className={`message-bubble ${message.senderId === user.id ? "outgoing" : "incoming"}`}><b>{message.senderId === user.id ? "You" : message.senderName}</b><p>{message.content}</p><small><time dateTime={message.createdAt}>{stamp(message.createdAt)}</time>{message.senderId === user.id && <span> · {message.readAt ? "Read" : "Sent"}</span>}</small></article></div>) : <div className="messaging-empty"><Mail size={32}/><b>Say hello to {selected.name.split(" ")[0]}</b><p>Your messages and replies will appear here.</p></div>}<div ref={bottom}/></div>
-        <form className="conversation-compose" onSubmit={send}><label htmlFor="message-content">{selected.active ? `Message ${selected.name.split(" ")[0]}` : "This account is inactive. Conversation history is still available."}</label><textarea id="message-content" rows={3} maxLength={5000} placeholder="Write your message…" value={content} disabled={!selected.active || busy} onChange={(event) => setDrafts((values) => ({ ...values, [selectedId]: event.target.value }))}/><ErrorAlert message={error} onClose={() => setError("")}/><div><small>{content.length.toLocaleString()} / 5,000</small><button className="button button-primary" disabled={busy || !content.trim() || !selected.active} aria-busy={busy}>{busy ? <Spinner/> : <Send size={16}/>} {busy ? "Sending…" : "Send message"}</button></div></form>
+        <div className="conversation-history" role="log" aria-label={`Conversation with ${selected.name}`} aria-live="polite">{thread.length ? thread.map((message, index) => <div key={message.id}>{(index === 0 || new Date(thread[index - 1].createdAt).toDateString() !== new Date(message.createdAt).toDateString()) && <div className="conversation-date">{new Date(message.createdAt).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}</div>}<article className={`message-bubble ${message.senderId === user.id ? "outgoing" : "incoming"}`}><b>{message.senderId === user.id ? "You" : message.senderName}</b><p>{message.content}</p><small><time dateTime={message.createdAt}>{stamp(message.createdAt)}</time>{message.senderId === user.id && <span className={`message-delivery ${message.readAt ? "message-read" : ""}`} title={message.readAt ? `Read ${stamp(message.readAt)}` : "Delivered to inbox"}><CheckCheck size={15} aria-hidden="true"/>{message.readAt ? "Read" : "Delivered"}</span>}</small></article></div>) : <div className="messaging-empty"><Mail size={32}/><b>Say hello to {selected.name.split(" ")[0]}</b><p>Your messages and replies will appear here.</p></div>}<div ref={bottom}/></div>
+        <form className="conversation-compose" onSubmit={send}><label htmlFor="message-content">{selected.active ? `Message ${selected.name.split(" ")[0]}` : "This account is inactive. Conversation history is still available."}</label><textarea id="message-content" rows={3} maxLength={5000} placeholder="Write your message…" value={content} disabled={!selected.active || busy} onChange={(event) => setDrafts((values) => ({ ...values, [selectedId]: event.target.value }))}/><ErrorAlert message={error} onClose={() => setError("")}/><div><small role="status">{sentNotice?.recipientId === selectedId ? "Message sent" : `${content.length.toLocaleString()} / 5,000`}</small><button className="button button-primary" disabled={busy || !content.trim() || !selected.active} aria-busy={busy}>{busy ? <Spinner/> : <Send size={16}/>} {busy ? "Sending…" : "Send message"}</button></div></form>
       </> : <div className="messaging-empty messaging-welcome"><span><Mail size={36}/></span><h2>Your team, one conversation away</h2><p>Select a conversation to read and reply, or choose a team member to start a new one.</p><button className="button button-primary" onClick={() => picker.current?.focus()}><Plus size={17}/> New conversation</button></div>}</div>
     </section>
   </>;

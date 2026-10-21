@@ -5,3 +5,5 @@ export const REQUEST_OPTIONS: Record<string, string[]> = {
   Incident: ["Network Issue", "Application Error", "Device Troubleshooting"],
   "Service Request": ["New Employee / Onboarding", "Offboarding", "VPN Access Request", "Windows 365 cloud PC Provisioning"],
 };
+
+export const statusLabel = (status: string) => status === "InProgress" ? "In progress" : status;

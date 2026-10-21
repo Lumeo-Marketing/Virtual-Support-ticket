@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { getDb, logActivity } from "@/lib/db";
 import { notifyMessage } from "@/lib/notifications";
@@ -31,32 +31,42 @@ export async function POST(request: Request) {
   const actor = await getCurrentUser();
   if (!actor) return NextResponse.json({ error: "Sign in required." }, { status: 401 });
 
-  const body = await request.json();
-  const recipientId = Number(body.recipientId);
-  const content = String(body.content || "").trim();
-  if (!Number.isInteger(recipientId) || recipientId < 1 || content.length < 1 || content.length > 5000) {
-    return NextResponse.json({ error: "Enter a message between 1 and 5,000 characters." }, { status: 400 });
+  const body = await request.json().catch(() => null);
+  const recipientId = Number(body?.recipientId);
+  const content = typeof body?.content === "string" ? body.content.trim() : "";
+  if (!Number.isSafeInteger(recipientId) || recipientId < 1 || content.length < 1 || content.length > 5000) {
+    return NextResponse.json({ error: "Enter a message between 1 and 5,000 characters and choose a recipient." }, { status: 400 });
   }
-
-  const db = await getDb();
-  const recipient = await db.query(`SELECT id,name,email,role,active,is_super_admin AS "isSuperAdmin" FROM users WHERE id=$1`, [recipientId]);
-  const target = recipient.rows[0];
   if (recipientId === actor.id) return NextResponse.json({ error: "Choose another team member." }, { status: 400 });
-  if (!target || !Boolean(target.active)) return NextResponse.json({ error: "That user is not available." }, { status: 404 });
 
-  const result = await db.query(`INSERT INTO messages (sender_id,recipient_id,content,created_at)
-    VALUES ($1,$2,$3,NOW()) RETURNING id,created_at AS "createdAt"`, [actor.id, recipientId, content]);
-  const message = result.rows[0];
-  await logActivity(actor, "sent message", "message", message.id, `Message sent to ${target.name}`);
-  await notifyMessage({
-    recipientId: Number(target.id),
-    recipientEmail: String(target.email),
-    senderName: actor.name,
-    senderRole: actor.isSuperAdmin ? "Super administrator" : actor.role === "admin" ? "IT administrator" : "Staff member",
-    content,
-  });
+  try {
+    const db = await getDb();
+    const recipient = await db.query(`SELECT id,name,email,role,active,is_super_admin AS "isSuperAdmin" FROM users WHERE id=$1`, [recipientId]);
+    const target = recipient.rows[0];
+    if (!target || !Boolean(target.active)) return NextResponse.json({ error: "That user is not available." }, { status: 404 });
 
-  return NextResponse.json({ message: { id: Number(message.id), senderId: actor.id, recipientId, content, createdAt: message.createdAt } }, { status: 201 });
+    const result = await db.query(`INSERT INTO messages (sender_id,recipient_id,content,created_at)
+      VALUES ($1,$2,$3,NOW()) RETURNING id,created_at AS "createdAt"`, [actor.id, recipientId, content]);
+    const message = result.rows[0];
+    // Delivery succeeds when persisted. Mail and audit outages must not report a failed send.
+    after(async () => {
+      const results = await Promise.allSettled([
+        logActivity(actor, "sent message", "message", message.id, `Message sent to ${target.name}`),
+        notifyMessage({
+          recipientId: Number(target.id), recipientEmail: String(target.email), senderName: actor.name,
+          senderRole: actor.isSuperAdmin ? "Super administrator" : actor.role === "admin" ? "IT administrator" : "Staff member",
+          content,
+        }),
+      ]);
+      for (const result of results) {
+        if (result.status === "rejected") console.error("Message saved but follow-up failed", result.reason instanceof Error ? result.reason.message : "Unknown error");
+      }
+    });
+    return NextResponse.json({ message: { id: Number(message.id), senderId: actor.id, recipientId, content, createdAt: message.createdAt, readAt: null } }, { status: 201 });
+  } catch (error) {
+    console.error("Message send failed", error instanceof Error ? error.message : "Unknown error");
+    return NextResponse.json({ error: "Could not send your message. Please try again." }, { status: 500 });
+  }
 }
 
 export async function PATCH(request: Request) {
