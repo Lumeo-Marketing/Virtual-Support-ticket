@@ -12,7 +12,7 @@ const senderName = "Lumeo Virtual Ticket";
 
 function escapeHtml(value: unknown) {
   return String(value ?? "").replace(/[&<>\"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" })[char]!);
-}
+} 
 
 function mailer() {
   if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASSWORD) return null;
