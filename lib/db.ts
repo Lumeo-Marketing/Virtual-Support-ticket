@@ -14,6 +14,7 @@ export interface UserRecord {
   location: string | null;
   active: boolean;
   isSuperAdmin: boolean;
+  sessionVersion?: number;
 }
 
 export interface TicketRecord {
@@ -155,6 +156,15 @@ async function initializeDatabase() {
     `);
     await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT TRUE");
     await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_super_admin BOOLEAN NOT NULL DEFAULT FALSE");
+    await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS session_version INTEGER NOT NULL DEFAULT 0");
+    await client.query(`CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      token_hash TEXT PRIMARY KEY,
+      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      email_at_issue TEXT NOT NULL,
+      password_hash_at_issue TEXT NOT NULL,
+      expires_at TIMESTAMPTZ NOT NULL
+    )`);
+    await client.query("CREATE INDEX IF NOT EXISTS password_reset_tokens_user_idx ON password_reset_tokens(user_id)");
     await client.query("ALTER TABLE tickets ADD COLUMN IF NOT EXISTS attachment_data BYTEA");
     await client.query(`CREATE TABLE IF NOT EXISTS messages (
       id BIGSERIAL PRIMARY KEY,
@@ -205,7 +215,7 @@ export async function getDb(): Promise<Pool> {
 
 export function asUser(row: Record<string, unknown>): UserRecord {
   const isSuperAdmin = Boolean(row.is_super_admin ?? row.isSuperAdmin) || String(row.email).trim().toLowerCase() === "godwin@lumeomarketing.com";
-  return { id: Number(row.id), name: String(row.name), email: String(row.email), role: isSuperAdmin ? "superadmin" : row.role as Role, isSuperAdmin, active: Boolean(row.active ?? true), department: row.department ? String(row.department) : null, jobTitle: (row.job_title ?? row.jobTitle) ? String(row.job_title ?? row.jobTitle) : null, location: row.location ? String(row.location) : null };
+  return { sessionVersion: Number(row.session_version || 0), id: Number(row.id), name: String(row.name), email: String(row.email), role: isSuperAdmin ? "superadmin" : row.role as Role, isSuperAdmin, active: Boolean(row.active ?? true), department: row.department ? String(row.department) : null, jobTitle: (row.job_title ?? row.jobTitle) ? String(row.job_title ?? row.jobTitle) : null, location: row.location ? String(row.location) : null };
 }
 
 export async function logActivity(actor: UserRecord, action: string, entityType: string, entityId: string | number | null, details = "") {

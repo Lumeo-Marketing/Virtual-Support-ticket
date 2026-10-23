@@ -61,6 +61,12 @@ function load(file, mocks, env = process.env) {
       assert.doesNotMatch(serialized, /Secure|Partitioned/);
     }
     assert.equal((await auth.getCurrentUser()).id, user.id);
+    user.session_version = 1;
+    assert.equal(await auth.getCurrentUser(), null, 'A password reset invalidates an older session');
+    await auth.createSession({ ...user, sessionVersion: 1 });
+    assert.equal((await auth.getCurrentUser()).id, user.id, 'New sessions work after a password reset');
+    delete user.session_version;
+    await auth.createSession(user);
     user.active = false;
     assert.equal(await auth.getCurrentUser(), null);
     user.active = true;

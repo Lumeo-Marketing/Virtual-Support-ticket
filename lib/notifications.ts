@@ -150,3 +150,15 @@ export async function notifyMessage(input: { recipientId: number; recipientEmail
   }, `message notification to ${input.recipientEmail}`);
 }
 
+
+export async function notifyUserCreated(input: { name: string; email: string; temporaryPassword: string; resetToken: string }) {
+  // A fragment keeps the reset secret out of HTTP request URLs and referrer headers.
+  const resetUrl = `${appOrigin()}/reset-password#token=${encodeURIComponent(input.resetToken)}`;
+  const title = "Your LUMEO support account is ready";
+  await deliver({
+    to: input.email,
+    subject: title,
+    text: `Hi ${input.name},\n\nYour LUMEO support account has been created.\nWork email: ${input.email}\nTemporary password: ${input.temporaryPassword}\n\nSet your own password: ${resetUrl}\n\nThis reset link expires in 24 hours and can only be used once. Your new password will replace the temporary password.\n\nSign in: ${appOrigin()}/`,
+    html: shell(title, "Set your password to get started with LUMEO support.", `<div style="display:inline-block;padding:5px 9px;border-radius:20px;background:#fff3e3;color:#b66b24;font-size:10px;font-weight:700">WELCOME TO LUMEO</div><h1 style="margin:16px 0 8px;color:#202c3b;font-size:23px">Your account is ready, ${escapeHtml(input.name.split(" ")[0])}.</h1><p style="font-size:13px;line-height:1.7;color:#677483">Your administrator has created your support account. Use the button below to choose your own password.</p><div style="padding:16px;border:1px solid #f0dfca;border-radius:8px;background:#fffaf4"><p style="margin:0 0 10px;font-size:12px;color:#677483">Work email: <b>${escapeHtml(input.email)}</b></p><p style="margin:0;font-size:12px;color:#677483">Temporary password</p><p style="margin:7px 0 0;font-family:monospace;font-size:17px;color:#344355;word-break:break-all">${escapeHtml(input.temporaryPassword)}</p></div><p style="margin:22px 0"><a href="${escapeHtml(resetUrl)}" style="display:inline-block;padding:12px 18px;border-radius:7px;background:#ef8b32;color:white;text-decoration:none;font-size:13px;font-weight:700">Set your password &nbsp;→</a></p><p style="font-size:12px;color:#84909d;line-height:1.7">This link expires in 24 hours and can only be used once. Your new password replaces the temporary password.</p>`),
+  }, "new account welcome email");
+}

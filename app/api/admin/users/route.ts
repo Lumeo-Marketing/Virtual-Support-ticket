@@ -1,7 +1,10 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { getCurrentUser } from "@/lib/auth";
 import { getDb, logActivity } from "@/lib/db";
+import { newPasswordReset, newTemporaryPassword } from "@/lib/password-reset";
+import { passwordValidationError } from "@/lib/passwords";
+import { notifyUserCreated } from "@/lib/notifications";
 
 export async function GET() {
   const actor = await getCurrentUser();
@@ -20,7 +23,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const name = String(body.name || "").trim();
     const email = String(body.email || "").trim().toLowerCase();
-    const password = String(body.password || "");
+    const password = typeof body.password === "string" && body.password ? body.password : newTemporaryPassword();
     const requestedRole = String(body.role || "staff");
     const isSuperAdmin = requestedRole === "superadmin" || body.isSuperAdmin === true;
     const role = requestedRole === "superadmin" ? "admin" : requestedRole;
@@ -28,15 +31,37 @@ export async function POST(request: Request) {
     const jobTitle = String(body.jobTitle || "").trim();
     const location = String(body.location || "").trim();
     if (!actor.isSuperAdmin && (isSuperAdmin || email === "godwin@lumeomarketing.com")) return NextResponse.json({ error: "Only the super administrator can create a super administrator." }, { status: 403 });
-    if (name.length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 10 || !["staff", "admin"].includes(role)) {
+    if (name.length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || Boolean(passwordValidationError(password)) || !["staff", "admin"].includes(role)) {
       return NextResponse.json({ error: "Provide a name, valid work email, staff/admin role, and password of at least 10 characters." }, { status: 400 });
     }
     const now = new Date().toISOString();
     const db = await getDb();
-    const result = await db.query(`INSERT INTO users (name,email,password_hash,role,department,job_title,location,is_super_admin,created_at)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`, [name, email, await bcrypt.hash(password, 12), role, department || null, jobTitle || null, location || null, isSuperAdmin, now]);
-    const id = Number(result.rows[0].id);
-    await logActivity(actor, "created account", "user", id, `${isSuperAdmin ? "super-admin" : role} account created for ${email}`);
+    const passwordHash = await bcrypt.hash(password, 12);
+    const reset = newPasswordReset();
+    const client = await db.connect();
+    let id: number;
+    try {
+      await client.query("BEGIN");
+      const result = await client.query(`INSERT INTO users (name,email,password_hash,role,department,job_title,location,is_super_admin,created_at)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`, [name, email, passwordHash, role, department || null, jobTitle || null, location || null, isSuperAdmin, now]);
+      id = Number(result.rows[0].id);
+      await client.query(`INSERT INTO password_reset_tokens (token_hash,user_id,email_at_issue,password_hash_at_issue,expires_at) VALUES ($1,$2,$3,$4,$5)`, [reset.tokenHash, id, email, passwordHash, reset.expiresAt]);
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+    after(async () => {
+      const results = await Promise.allSettled([
+        logActivity(actor, "created account", "user", id, `${isSuperAdmin ? "super-admin" : role} account created for ${email}`),
+        notifyUserCreated({ name, email, temporaryPassword: password, resetToken: reset.token }),
+      ]);
+      for (const result of results) {
+        if (result.status === "rejected") console.error("Account created but follow-up failed");
+      }
+    });
     return NextResponse.json({ user: { id, name, email, role, department, jobTitle, location, active: true, isSuperAdmin, createdAt: now, ticketCount: 0 } }, { status: 201 });
   } catch (error) {
     if (typeof error === "object" && error !== null && "code" in error && error.code === "23505") return NextResponse.json({ error: "An account with that email already exists." }, { status: 409 });
