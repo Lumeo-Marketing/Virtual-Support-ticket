@@ -127,8 +127,8 @@ export default function Home() {
   const signedInUserId = user?.id;
   useEffect(() => {
     if (!signedInUserId) return;
-    const id = new URLSearchParams(window.location.search).get("ticket");
-    if (!id || !/^[1-9]\d*$/.test(id)) return;
+    const id = pathname.match(/^\/tickets\/([1-9]\d*)\/?$/)?.[1] || new URLSearchParams(window.location.search).get("ticket");
+    if (!id || !/^[1-9]\d*$/.test(id) || !Number.isSafeInteger(Number(id))) return;
     let cancelled = false;
     void (async () => {
       try {
@@ -141,7 +141,7 @@ export default function Home() {
       }
     })();
     return () => { cancelled = true; };
-  }, [signedInUserId, notify]);
+  }, [signedInUserId, pathname, notify]);
 
   const markMessagesRead = useCallback((ids: number[], readAt: string) => {
     setMessages((rows) => rows.map((message) => ids.includes(message.id) ? { ...message, readAt } : message));

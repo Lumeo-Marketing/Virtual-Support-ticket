@@ -6,7 +6,7 @@ function load(file, mocks, suffix = '', globals = {}) {
   const exports = {};
   vm.runInNewContext(ts.transpileModule(fs.readFileSync(file, 'utf8') + suffix, {
     compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true },
-  }).outputText, { exports, require: (name) => mocks[name] || require(name), process, console, ...globals });
+  }).outputText, { exports, require: (name) => mocks[name] || require(name), process, console, URL, ...globals });
   return exports;
 }
 const constants = load('lib/constants.ts', {});
@@ -90,8 +90,8 @@ const patch = async (body) => {
   await mail.notifyTicketUpdate({ userId: 2, ticket: { ...details, status: 'InProgress' }, previousStatus: 'Open', actor: { name: 'Admin', role: 'admin' } });
   assert.equal(sent.length, 4);
   for (const message of sent) {
-    assert.ok(message.html.includes('href="https://support.example.com/?ticket=7"'), 'Every ticket email button opens its ticket');
-    assert.ok(message.text.includes('https://support.example.com/?ticket=7'), 'Plain text emails contain the same ticket link');
+    assert.ok(message.html.includes('href="https://support.example.com/tickets/7"'), 'Every ticket email button opens its ticket');
+    assert.ok(message.text.includes('https://support.example.com/tickets/7'), 'Plain text emails contain the same ticket link');
   }
   await mail.notifyMessage({ recipientId: 2, recipientEmail: 'requester@example.com', senderName: 'Admin', senderRole: 'admin', content: 'Hello' });
   assert.ok(sent.at(-1).html.includes('href="https://support.example.com/messages"'));

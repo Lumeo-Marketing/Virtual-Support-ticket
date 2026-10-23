@@ -50,12 +50,28 @@ function descriptionBlock(label: string, text: string) {
   return `<div style="margin-top:18px"><p style="margin:0 0 7px;color:#697584;font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase">${escapeHtml(label)}</p><div style="padding:13px 14px;border:1px solid #ebedf0;border-radius:8px;background:#fafbfc;color:#465363;font-size:12px;line-height:1.65;white-space:pre-wrap">${escapeHtml(text)}</div></div>`;
 }
 
+function appOrigin() {
+  const railwayOrigin = process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : null;
+  const configured = process.env.APP_URL?.trim();
+  for (const candidate of [configured, railwayOrigin, "http://localhost:3000"]) {
+    if (!candidate) continue;
+    try {
+      const url = new URL(candidate);
+      if (!["http:", "https:"].includes(url.protocol)) continue;
+      // Railway provides the public host when APP_URL still contains a local development URL.
+      if (railwayOrigin && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)) continue;
+      return url.origin;
+    } catch { /* Try the Railway public domain when APP_URL is missing or invalid. */ }
+  }
+  return "http://localhost:3000";
+}
+
 function ticketUrl(id: number) {
-  return `${(process.env.APP_URL || "http://localhost:3000").replace(/\/$/, "")}/?ticket=${id}`;
+  return `${appOrigin()}/tickets/${id}`;
 }
 
 function actionButton(label: string, ticketId?: number) {
-  const url = ticketId == null ? `${(process.env.APP_URL || "http://localhost:3000").replace(/\/$/, "")}/messages` : ticketUrl(ticketId);
+  const url = ticketId == null ? `${appOrigin()}/messages` : ticketUrl(ticketId);
   return `<p style="margin:22px 0 0"><a href="${escapeHtml(url)}" style="display:inline-block;padding:12px 17px;border-radius:7px;background:#ef8b32;color:#fff;text-decoration:none;font-size:12px;font-weight:700">${escapeHtml(label)} &nbsp;→</a></p>`;
 }
 
